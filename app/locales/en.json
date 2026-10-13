@@ -160,7 +160,11 @@
     "successTitle": "Success! ✅",
     "successDesc": "Your password has been changed. Please log in.",
     "invalidCode": "The code is incorrect or has expired.",
-    "backToLogin": "← Back to login"
+    "backToLogin": "← Back to login",
+    "resendNow": "Send a new code",
+    "resendIn": "Send again in {{s}} s",
+    "resent": "A new code has been sent. The previous code no longer works.",
+    "changeEmail": "Use a different email"
   },
   "password": {
     "minLength": "Min. 6 characters",

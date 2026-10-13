@@ -160,7 +160,11 @@
     "successTitle": "Erfolg! ✅",
     "successDesc": "Ihr Passwort wurde geändert. Bitte melden Sie sich an.",
     "invalidCode": "Der Code ist falsch oder abgelaufen.",
-    "backToLogin": "← Zurück zur Anmeldung"
+    "backToLogin": "← Zurück zur Anmeldung",
+    "resendNow": "Neuen Code senden",
+    "resendIn": "Erneut senden in {{s}} s",
+    "resent": "Ein neuer Code wurde gesendet. Der vorherige Code ist nicht mehr gültig.",
+    "changeEmail": "Andere E-Mail verwenden"
   },
   "validation": {
     "enterFirstName": "Bitte geben Sie Ihren Vornamen ein.",

@@ -160,7 +160,11 @@
     "successTitle": "Succès ! ✅",
     "successDesc": "Votre mot de passe a été changé. Veuillez vous connecter.",
     "invalidCode": "Le code est incorrect ou a expiré.",
-    "backToLogin": "← Retour à la connexion"
+    "backToLogin": "← Retour à la connexion",
+    "resendNow": "Envoyer un nouveau code",
+    "resendIn": "Renvoyer dans {{s}} s",
+    "resent": "Un nouveau code a été envoyé. L'ancien code n'est plus valable.",
+    "changeEmail": "Utiliser une autre e-mail"
   },
   "password": {
     "minLength": "Min. 6 caractères",

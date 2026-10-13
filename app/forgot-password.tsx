@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   ActivityIndicator,
@@ -19,6 +19,9 @@ import { T } from "../styles/varaTheme";
 
 type Step = "email" | "code" | "newPassword";
 
+/** Poslužitelj ne šalje novi kod češće od jednom u minuti (isti razmak ovdje). */
+const RESEND_SECONDS = 60;
+
 export default function ForgotPasswordScreen() {
   const { t } = useTranslation();
   const [step, setStep] = useState<Step>("email");
@@ -32,6 +35,16 @@ export default function ForgotPasswordScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  // Odbrojavanje do ponovnog slanja. Dok traje, poslužitelj bi zahtjev tiho
+  // preskočio (isti odgovor, bez e-maila) — pa se gumb do tada ne nudi, da
+  // korisnik ne dobije "kod poslan" za poruku koja nikad nije poslana.
+  const [secondsLeft, setSecondsLeft] = useState(0);
+
+  useEffect(() => {
+    if (secondsLeft <= 0) return;
+    const id = setTimeout(() => setSecondsLeft((s) => s - 1), 1000);
+    return () => clearTimeout(id);
+  }, [secondsLeft]);
 
   const handleRequestCode = async () => {
     if (!contact.trim()) {
@@ -51,10 +64,44 @@ export default function ForgotPasswordScreen() {
 
       if (response.ok) {
         setEmail(contact.trim());
+        setCode("");
         setStep("code");
+        setSecondsLeft(RESEND_SECONDS);
         Alert.alert(
           t("forgotPassword.codeSentTitle"),
           t("forgotPassword.codeSentDesc", { contact }) +
+            "\n\n" +
+            t("forgotPassword.checkSpamNote"),
+        );
+      } else if (response.status === 429) {
+        Alert.alert(t("common.error"), t("common.tooManyRequests"));
+      } else {
+        Alert.alert(t("common.error"), t("forgotPassword.tryAgain"));
+      }
+    } catch {
+      Alert.alert(t("common.error"), t("common.networkError"));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // "Pošalji novi kod" na koraku unosa koda: kod nije stigao, istekao je ili je
+  // potrošeno 5 pokušaja. Novi kod poništava stari, pa se polje čisti.
+  const handleResendCode = async () => {
+    if (secondsLeft > 0 || isLoading) return;
+    setIsLoading(true);
+    try {
+      const response = await fetch(API_ENDPOINTS.FORGOT_PASSWORD, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: (email || contact).trim() }),
+      });
+      if (response.ok) {
+        setCode("");
+        setSecondsLeft(RESEND_SECONDS);
+        Alert.alert(
+          t("forgotPassword.codeSentTitle"),
+          t("forgotPassword.resent") +
             "\n\n" +
             t("forgotPassword.checkSpamNote"),
         );
@@ -276,13 +323,31 @@ export default function ForgotPasswordScreen() {
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.resendBtn}
+                onPress={handleResendCode}
+                disabled={secondsLeft > 0 || isLoading}
+              >
+                <Text
+                  style={[
+                    styles.resendText,
+                    secondsLeft > 0 && styles.resendTextDisabled,
+                  ]}
+                >
+                  {secondsLeft > 0
+                    ? t("forgotPassword.resendIn", { s: secondsLeft })
+                    : t("forgotPassword.resendNow")}
+                </Text>
+              </TouchableOpacity>
+              {/* Pogrešna adresa: natrag na unos e-maila i cijeli postupak ispočetka. */}
+              <TouchableOpacity
+                style={styles.resendBtn}
                 onPress={() => {
                   setStep("email");
                   setCode("");
+                  setResetToken("");
                 }}
               >
                 <Text style={styles.resendText}>
-                  {t("forgotPassword.resendCode")}
+                  {t("forgotPassword.changeEmail")}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -502,6 +567,7 @@ const styles = StyleSheet.create({
   },
   resendBtn: { marginTop: 16, alignItems: "center" },
   resendText: { color: GREEN_MID, fontSize: T.body, fontWeight: "600" },
+  resendTextDisabled: { color: SILVER },
   backBtn: { marginTop: 28 },
   backText: { color: TEXT_MID, fontSize: T.body },
   errorText: { color: "#C0392B", fontSize: T.meta, marginBottom: 4 },

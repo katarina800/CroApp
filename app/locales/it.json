@@ -160,7 +160,11 @@
     "successTitle": "Successo! ✅",
     "successDesc": "La password è stata cambiata. Accedi.",
     "invalidCode": "Il codice non è corretto o è scaduto.",
-    "backToLogin": "← Torna all'accesso"
+    "backToLogin": "← Torna all'accesso",
+    "resendNow": "Invia un nuovo codice",
+    "resendIn": "Invia di nuovo tra {{s}} s",
+    "resent": "È stato inviato un nuovo codice. Il codice precedente non è più valido.",
+    "changeEmail": "Usa un'altra e-mail"
   },
   "password": {
     "minLength": "Min. 6 caratteri",
