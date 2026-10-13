@@ -155,6 +155,15 @@ export default function LoginScreen() {
           t("auth.welcomeMessage", { name: data.firstName }),
           [{ text: t("common.ok"), onPress: () => router.replace("/(tabs)") }],
         );
+      } else if (response.status === 403 && data?.code === "emailNotVerified") {
+        // Lozinka je točna, ali e-mail nije potvrđen: na ekran za unos koda
+        // (poslužitelj ga šalje na zahtjev, pa resend=1).
+        router.push({
+          pathname: "/verify-email",
+          params: { email: data.email ?? "", resend: "1" },
+        });
+      } else if (response.status === 429) {
+        Alert.alert(t("common.error"), t("common.tooManyRequests"));
       } else {
         Alert.alert(t("common.error"), t("validation.invalidCredentials"));
       }

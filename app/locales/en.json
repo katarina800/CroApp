@@ -1113,5 +1113,20 @@
     "s7Body": "Follow the people and categories you care about. The bell tells you when something new appears nearby.",
     "sectionTitle": "Tutorial",
     "sectionDesc": "A short tour of what VARA can do — seven steps."
+  },
+  "verifyEmail": {
+    "title": "Confirm your email",
+    "subtitle": "We sent a 6-digit code to {{email}}",
+    "codeLabel": "6-digit code",
+    "verifyBtn": "Confirm email",
+    "resend": "Send a new code",
+    "resendIn": "Send again in {{s}} s",
+    "resent": "A new code has been sent to your email.",
+    "checkSpam": "If you don't see the email, check your spam/junk folder.",
+    "successTitle": "Email confirmed ✅",
+    "successDesc": "Your account is ready. Please log in.",
+    "invalidCode": "The code is incorrect or has expired.",
+    "enterCode": "Enter the 6-digit code",
+    "backToLogin": "← Back to login"
   }
 }

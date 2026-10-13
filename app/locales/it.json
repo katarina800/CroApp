@@ -1114,5 +1114,20 @@
     "s7Body": "Segui le persone e le categorie che ti interessano. La campanella ti avvisa quando c'è qualcosa di nuovo vicino a te.",
     "sectionTitle": "Guida",
     "sectionDesc": "Una breve panoramica di VARA — sette passaggi."
+  },
+  "verifyEmail": {
+    "title": "Conferma la tua e-mail",
+    "subtitle": "Abbiamo inviato un codice di 6 cifre a {{email}}",
+    "codeLabel": "Codice di 6 cifre",
+    "verifyBtn": "Conferma e-mail",
+    "resend": "Invia un nuovo codice",
+    "resendIn": "Invia di nuovo tra {{s}} s",
+    "resent": "Un nuovo codice è stato inviato alla tua e-mail.",
+    "checkSpam": "Se non vedi il messaggio, controlla la cartella spam.",
+    "successTitle": "E-mail confermata ✅",
+    "successDesc": "Il tuo account è pronto. Accedi.",
+    "invalidCode": "Il codice non è corretto o è scaduto.",
+    "enterCode": "Inserisci il codice di 6 cifre",
+    "backToLogin": "← Torna all'accesso"
   }
 }

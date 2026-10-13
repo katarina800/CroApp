@@ -1111,5 +1111,20 @@
     "s7Body": "Zaprati ljude i kategorije koje te zanimaju. Zvono javlja kad se u tvojoj blizini pojavi nešto novo.",
     "sectionTitle": "Vodič",
     "sectionDesc": "Kratki pregled onoga što VARA nudi — sedam koraka."
+  },
+  "verifyEmail": {
+    "title": "Potvrdite e-mail",
+    "subtitle": "Poslali smo 6-znamenkasti kod na {{email}}",
+    "codeLabel": "6-znamenkasti kod",
+    "verifyBtn": "Potvrdi e-mail",
+    "resend": "Pošalji novi kod",
+    "resendIn": "Ponovno slanje za {{s}} s",
+    "resent": "Novi kod je poslan na vaš e-mail.",
+    "checkSpam": "Ako ne vidite poruku, provjerite mapu s neželjenom poštom (spam).",
+    "successTitle": "E-mail potvrđen ✅",
+    "successDesc": "Vaš račun je spreman. Prijavite se.",
+    "invalidCode": "Kod je neispravan ili je istekao.",
+    "enterCode": "Unesite 6-znamenkasti kod",
+    "backToLogin": "← Natrag na prijavu"
   }
 }

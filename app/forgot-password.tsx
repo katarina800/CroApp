@@ -24,6 +24,8 @@ export default function ForgotPasswordScreen() {
   const [step, setStep] = useState<Step>("email");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
+  // Jednokratna dozvola koju poslužitelj izda tek kad provjeri 6-znamenkasti kod.
+  const [resetToken, setResetToken] = useState("");
   const [contact, setContact] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -39,7 +41,7 @@ export default function ForgotPasswordScreen() {
     setIsLoading(true);
     try {
       const response = await fetch(
-        `${API_ENDPOINTS.LOGIN.replace("/login", "/forgot-password")}`,
+        API_ENDPOINTS.FORGOT_PASSWORD,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -56,11 +58,8 @@ export default function ForgotPasswordScreen() {
             "\n\n" +
             t("forgotPassword.checkSpamNote"),
         );
-      } else if (response.status === 404) {
-        Alert.alert(
-          t("forgotPassword.notFoundTitle"),
-          t("forgotPassword.notFoundDesc"),
-        );
+      } else if (response.status === 429) {
+        Alert.alert(t("common.error"), t("common.tooManyRequests"));
       } else {
         Alert.alert(t("common.error"), t("forgotPassword.tryAgain"));
       }
@@ -71,12 +70,43 @@ export default function ForgotPasswordScreen() {
     }
   };
 
-  const handleVerifyCode = () => {
+  // Kod se provjerava na poslužitelju PRIJE ekrana za novu lozinku. Dosad je
+  // ovdje bilo samo "ima li 6 znamenki", pa je pogrešan kod korisnik saznao
+  // tek nakon što je smislio i dvaput upisao novu lozinku. Uz to poslužitelj
+  // broji pogrešne pokušaje (5) i nakon toga poništava kod.
+  const handleVerifyCode = async () => {
     if (code.trim().length !== 6) {
       Alert.alert(t("common.error"), t("forgotPassword.enterCode"));
       return;
     }
-    setStep("newPassword");
+    setIsLoading(true);
+    try {
+      const response = await fetch(API_ENDPOINTS.VERIFY_RESET_CODE, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: (email || contact).trim(),
+          code: code.trim(),
+        }),
+      });
+      if (response.ok) {
+        const data = await response.json().catch(() => null);
+        if (!data?.resetToken) {
+          Alert.alert(t("common.error"), t("forgotPassword.tryAgain"));
+          return;
+        }
+        setResetToken(data.resetToken);
+        setStep("newPassword");
+      } else if (response.status === 429) {
+        Alert.alert(t("common.error"), t("common.tooManyRequests"));
+      } else {
+        Alert.alert(t("common.error"), t("forgotPassword.invalidCode"));
+      }
+    } catch {
+      Alert.alert(t("common.error"), t("common.networkError"));
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleResetPassword = async () => {
@@ -91,15 +121,15 @@ export default function ForgotPasswordScreen() {
     setIsLoading(true);
     try {
       const response = await fetch(
-        `${API_ENDPOINTS.LOGIN.replace("/login", "/reset-password")}`,
+        API_ENDPOINTS.RESET_PASSWORD,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          // E-mail se šalje uz kod: poslužitelj provjerava da kod pripada
-          // baš tom računu (prije je vrijedio bilo koji živi kod).
+          // Umjesto šest znamenki šalje se dozvola koju je poslužitelj izdao
+          // nakon što je kod provjerio; veže se uz e-mail baš tog računa.
           body: JSON.stringify({
             email: (email || contact).trim(),
-            code: code.trim(),
+            resetToken,
             newPassword,
           }),
         },
@@ -116,6 +146,10 @@ export default function ForgotPasswordScreen() {
           ],
         );
       } else {
+        // Dozvola je istekla (10 min) ili je neispravna: treba novi kod.
+        setResetToken("");
+        setCode("");
+        setStep("email");
         Alert.alert(t("common.error"), t("forgotPassword.invalidCode"));
       }
     } catch {
@@ -228,12 +262,17 @@ export default function ForgotPasswordScreen() {
                 autoFocus
               />
               <TouchableOpacity
-                style={styles.button}
+                style={[styles.button, isLoading && styles.buttonDisabled]}
                 onPress={handleVerifyCode}
+                disabled={isLoading}
               >
-                <Text style={styles.buttonText}>
-                  {t("forgotPassword.verifyCode")}
-                </Text>
+                {isLoading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.buttonText}>
+                    {t("forgotPassword.verifyCode")}
+                  </Text>
+                )}
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.resendBtn}

@@ -209,9 +209,15 @@ export default function RegisterScreen() {
         body: JSON.stringify(dataToSend),
       });
       if (response.ok) {
-        Alert.alert(t("common.success"), t("auth.registerSuccess"), [
-          { text: t("auth.loginBtn"), onPress: () => router.push("/login") },
-        ]);
+        // Račun postoji, ali se otvara tek kad se potvrdi kod poslan na e-mail.
+        // Adresa iz odgovora je ona koju je poslužitelj spremio (obrezana).
+        const created = await response.json().catch(() => null);
+        router.replace({
+          pathname: "/verify-email",
+          params: { email: created?.email ?? dataToSend.email ?? "" },
+        });
+      } else if (response.status === 429) {
+        Alert.alert(t("common.error"), t("common.tooManyRequests"));
       } else {
         const errorData = await response.json().catch(() => null);
         if (errorData?.field === "username" && errorData?.code === "taken") {

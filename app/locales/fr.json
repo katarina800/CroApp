@@ -1114,5 +1114,20 @@
     "s7Body": "Suis les personnes et les catégories qui t'intéressent. La cloche te prévient dès qu'il y a du nouveau près de toi.",
     "sectionTitle": "Guide",
     "sectionDesc": "Un aperçu rapide de VARA — sept étapes."
+  },
+  "verifyEmail": {
+    "title": "Confirmez votre e-mail",
+    "subtitle": "Nous avons envoyé un code à 6 chiffres à {{email}}",
+    "codeLabel": "Code à 6 chiffres",
+    "verifyBtn": "Confirmer l'e-mail",
+    "resend": "Envoyer un nouveau code",
+    "resendIn": "Renvoyer dans {{s}} s",
+    "resent": "Un nouveau code a été envoyé à votre e-mail.",
+    "checkSpam": "Si vous ne voyez pas le message, vérifiez votre dossier spam.",
+    "successTitle": "E-mail confirmé ✅",
+    "successDesc": "Votre compte est prêt. Connectez-vous.",
+    "invalidCode": "Le code est incorrect ou a expiré.",
+    "enterCode": "Saisissez le code à 6 chiffres",
+    "backToLogin": "← Retour à la connexion"
   }
 }

@@ -1113,5 +1113,20 @@
     "s7Body": "Folge den Menschen und Kategorien, die dich interessieren. Die Glocke meldet Neues in deiner Nähe.",
     "sectionTitle": "Anleitung",
     "sectionDesc": "Ein kurzer Überblick über VARA — sieben Schritte."
+  },
+  "verifyEmail": {
+    "title": "E-Mail bestätigen",
+    "subtitle": "Wir haben einen 6-stelligen Code an {{email}} gesendet",
+    "codeLabel": "6-stelliger Code",
+    "verifyBtn": "E-Mail bestätigen",
+    "resend": "Neuen Code senden",
+    "resendIn": "Erneut senden in {{s}} s",
+    "resent": "Ein neuer Code wurde an Ihre E-Mail gesendet.",
+    "checkSpam": "Wenn Sie die Nachricht nicht sehen, prüfen Sie Ihren Spam-Ordner.",
+    "successTitle": "E-Mail bestätigt ✅",
+    "successDesc": "Ihr Konto ist bereit. Bitte melden Sie sich an.",
+    "invalidCode": "Der Code ist falsch oder abgelaufen.",
+    "enterCode": "Geben Sie den 6-stelligen Code ein",
+    "backToLogin": "← Zurück zur Anmeldung"
   }
 }
