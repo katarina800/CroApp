@@ -136,8 +136,12 @@ export default function LoginScreen() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username: username.trim(), password }),
       });
-      const data = await response.json();
-      if (response.ok) {
+      // Odgovor se čita oprezno: poslužitelj uz grešku zna vratiti HTML (502/503
+      // dok se Render budi ili pada) ili prazno tijelo (429). Prije je ovdje stajao
+      // goli response.json(), koji bi u tom slučaju bacio izuzetak — a on je
+      // završavao u catch-u kao "Provjeri internetsku vezu", iako je veza bila u redu.
+      const data = await response.json().catch(() => null);
+      if (response.ok && data) {
         await AsyncStorage.setItem("token", data.token);
         await AsyncStorage.setItem("userId", data.userId.toString());
         // Da se u prijavama padova vidi pogađa li greška jednog korisnika
@@ -164,6 +168,13 @@ export default function LoginScreen() {
         });
       } else if (response.status === 429) {
         Alert.alert(t("common.error"), t("common.tooManyRequests"));
+      } else if (response.status >= 500 || (response.ok && !data)) {
+        // Poslužitelj je dostupan, ali ne radi ispravno. Šifra statusa ide u poruku
+        // da se vidi je li 502/503 (poslužitelj ne radi) ili 500 (greška u kodu/bazi).
+        Alert.alert(
+          t("common.error"),
+          `${t("common.serverError")} (${response.status})`,
+        );
       } else {
         Alert.alert(t("common.error"), t("validation.invalidCredentials"));
       }
