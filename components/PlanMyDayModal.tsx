@@ -41,6 +41,8 @@ import {
   placeCategories,
 } from "../app/services/locationService";
 import { T, pb } from "../styles/varaTheme";
+// Ikone (nove; stare viking kovanice su u LEGACY_ICONS, prekidač USE_LEGACY_ICONS).
+import { APP_ICONS } from "../constants/icons";
 import { useTheme } from "./AdaptiveThemeProvider";
 
 // ---------------------------------------------------------------------------
@@ -173,24 +175,25 @@ const EMOJIS: Record<string, string> = {
 // Marker slike
 
 const MARKER_IMAGES: Record<string, any> = {
-  restaurant: require("../assets/images/restoran.png"),
-  cafe: require("../assets/images/kafic.png"),
-  club: require("../assets/images/disco.png"),
-  beach: require("../assets/images/plaza.png"),
-  landmark: require("../assets/images/znamenitost.png"),
-  opg: require("../assets/images/opg.png"),
-  accommodation: require("../assets/images/smjestaj.png"),
-  market: require("../assets/images/trznica.png"),
-  paintball: require("../assets/images/paintball.png"),
-  cinema: require("../assets/images/kino.png"),
-  park: require("../assets/images/park.png"),
-  escapeRoom: require("../assets/images/escape.png"),
-  museum: require("../assets/images/muzej.png"),
-  theater: require("../assets/images/kazaliste.png"),
-  mountain: require("../assets/images/planina.png"),
-  nationalPark: require("../assets/images/nacpark.png"),
-  cave: require("../assets/images/spilja.png"),
-  spa: require("../assets/images/toplica.png"),
+  restaurant: APP_ICONS.restaurant,
+  cafe: APP_ICONS.cafe,
+  club: APP_ICONS.club,
+  beach: APP_ICONS.beach,
+  landmark: APP_ICONS.landmark,
+  opg: APP_ICONS.opg,
+  accommodation: APP_ICONS.accommodation,
+  market: APP_ICONS.market,
+  paintball: APP_ICONS.paintball,
+  cinema: APP_ICONS.cinema,
+  park: APP_ICONS.park,
+  escapeRoom: APP_ICONS.escapeRoom,
+  museum: APP_ICONS.museum,
+  theater: APP_ICONS.theater,
+  mountain: APP_ICONS.mountain,
+  nationalPark: APP_ICONS.nationalPark,
+  cave: APP_ICONS.cave,
+  spa: APP_ICONS.spa,
+  other: APP_ICONS.other,
 };
 
 const putnikIcon = require("../assets/images/putnik.png");
@@ -2116,24 +2119,28 @@ export function PlanMyDayModal({
                       {[
                         {
                           val: "solo" as CompanionType,
+                          icon: APP_ICONS.solo,
                           label: t("plan.companionSolo"),
                           emoji: "🧍",
                           desc: t("plan.companionSoloDesc"),
                         },
                         {
                           val: "partner" as CompanionType,
+                          icon: APP_ICONS.partner,
                           label: t("plan.companionPartner"),
                           emoji: "💑",
                           desc: t("plan.companionPartnerDesc"),
                         },
                         {
                           val: "prijatelji" as CompanionType,
+                          icon: APP_ICONS.prijatelji,
                           label: t("plan.companionFriends"),
                           emoji: "👯",
                           desc: t("plan.companionFriendsDesc"),
                         },
                         {
                           val: "obitelj" as CompanionType,
+                          icon: APP_ICONS.obitelj,
                           label: t("plan.companionFamily"),
                           emoji: "👨‍👩‍👧‍👦",
                           desc: t("plan.companionFamilyDesc"),
@@ -2160,7 +2167,15 @@ export function PlanMyDayModal({
                             )
                           }
                         >
-                          <Text style={{ fontSize: T.screen }}>{o.emoji}</Text>
+                          {o.icon ? (
+                            <Image
+                              source={o.icon}
+                              style={{ width: 40, height: 40 }}
+                              resizeMode="contain"
+                            />
+                          ) : (
+                            <Text style={{ fontSize: T.screen }}>{o.emoji}</Text>
+                          )}
                           <View style={{ flex: 1 }}>
                             <Text
                               style={{
@@ -2207,25 +2222,35 @@ export function PlanMyDayModal({
                       style={{ flexDirection: "row", gap: 6, flexWrap: "wrap" }}
                     >
                       {[
-                        { val: "auto" as TransportType, label: t("plan.car") },
+                        {
+                          val: "auto" as TransportType,
+                          label: t("plan.car"),
+                          icon: APP_ICONS.auto,
+                        },
                         {
                           val: "javni" as TransportType,
                           label: t("plan.public"),
+                          icon: APP_ICONS.javni,
                         },
                         {
                           val: "pjesice" as TransportType,
                           label: t("plan.walking"),
+                          icon: APP_ICONS.pjesice,
                         },
                         {
                           val: "bicikl" as TransportType,
                           label: t("plan.bicycle"),
+                          icon: APP_ICONS.bicikl,
                         },
                       ].map((o) => (
                         <TouchableOpacity
                           key={o.val}
                           style={{
-                            paddingHorizontal: 14,
-                            paddingVertical: 8,
+                            flexDirection: "row",
+                            alignItems: "center",
+                            gap: 8,
+                            paddingHorizontal: 12,
+                            paddingVertical: 6,
                             borderRadius: 8,
                             backgroundColor:
                               transport === o.val ? DC.cardHover : DC.bg,
@@ -2239,6 +2264,13 @@ export function PlanMyDayModal({
                             )
                           }
                         >
+                          {o.icon && (
+                            <Image
+                              source={o.icon}
+                              style={{ width: 28, height: 28 }}
+                              resizeMode="contain"
+                            />
+                          )}
                           <Text
                             style={{
                               fontSize: T.meta,

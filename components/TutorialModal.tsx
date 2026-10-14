@@ -18,6 +18,7 @@ import { useTranslation } from "react-i18next";
 import {
   FlatList,
   Image,
+  ImageSourcePropType,
   Modal,
   ScrollView,
   Text,
@@ -28,6 +29,8 @@ import {
 
 import { useTheme } from "./AdaptiveThemeProvider";
 import { T, V } from "../styles/varaTheme";
+// Ikone doba dana (nove; stare viking kovanice su u LEGACY_ICONS, prekidač USE_LEGACY_ICONS).
+import { APP_ICONS } from "../constants/icons";
 
 /**
  * Vodič se otvara preko cijelog ekrana, pa mora pratiti odabranu temu —
@@ -78,7 +81,7 @@ type Step = {
   /** Glavna slika iz aplikacije. */
   image?: number;
   /** Manje ikone ispod glavne; isti izvor kao u aplikaciji. */
-  extras?: number[];
+  extras?: ImageSourcePropType[];
   /** Gumb "+" kakav stoji u Videima. */
   plusButton?: boolean;
   /** Zastavice — aplikacija jezike i inače prikazuje njima. */
@@ -95,9 +98,9 @@ const PLAN_ICON = require("../assets/images/put.png");
 const VISITED_ICON = require("../assets/images/posmjesta.png");
 const BADGES_ICON = require("../assets/images/uspjeh.png");
 const RADIUS_ICON = require("../assets/images/radijus.png");
-const MORNING_ICON = require("../assets/images/jutro.png");
-const AFTERNOON_ICON = require("../assets/images/popodne.png");
-const EVENING_ICON = require("../assets/images/vecer.png");
+const MORNING_ICON = APP_ICONS.jutro as ImageSourcePropType;
+const AFTERNOON_ICON = APP_ICONS.poslijepodne as ImageSourcePropType;
+const EVENING_ICON = APP_ICONS.vecer as ImageSourcePropType;
 
 const STEPS: Step[] = [
   {

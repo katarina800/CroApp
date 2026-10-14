@@ -47,6 +47,8 @@ import {
 } from "@/hooks/use-keyboard-offset";
 import { useActivePolling } from "@/hooks/use-active-polling";
 import { isOpenAt, isOpenDuringWindow } from "@/utils/openingHours";
+// Ikone (nove; stare viking kovanice su u LEGACY_ICONS, prekidač USE_LEGACY_ICONS).
+import { APP_ICONS } from "../../constants/icons";
 import { NotificationsModal } from "@/components/NotificationsModal";
 import {
   getNotificationPreferences,
@@ -107,27 +109,27 @@ const locationPinIcon = require("../../assets/images/igla.png");
 const radiusIcon = require("../../assets/images/radijus.png");
 const zoomInIcon = require("../../assets/images/zoomin.png");
 const zoomOutIcon = require("../../assets/images/zoomout.png");
-const morningIcon = require("../../assets/images/jutro.png");
-const afternoonIcon = require("../../assets/images/popodne.png");
-const eveningIcon = require("../../assets/images/vecer.png");
-const restaurantIcon = require("../../assets/images/restoran.png");
-const cafeIcon = require("../../assets/images/kafic.png");
-const clubIcon = require("../../assets/images/disco.png");
-const beachIcon = require("../../assets/images/plaza.png");
-const landmarkIcon = require("../../assets/images/znamenitost.png");
-const opgIcon = require("../../assets/images/opg.png");
-const accommodationIcon = require("../../assets/images/smjestaj.png");
-const marketIcon = require("../../assets/images/trznica.png");
-const paintballIcon = require("../../assets/images/paintball.png");
-const cinemaIcon = require("../../assets/images/kino.png");
-const parkIcon = require("../../assets/images/park.png");
-const escapeRoomIcon = require("../../assets/images/escape.png");
-const museumIcon = require("../../assets/images/muzej.png");
-const theaterIcon = require("../../assets/images/kazaliste.png");
-const mountainIcon = require("../../assets/images/planina.png");
-const nationalParkIcon = require("../../assets/images/nacpark.png");
-const caveIcon = require("../../assets/images/spilja.png");
-const spaIcon = require("../../assets/images/toplica.png");
+const morningIcon = APP_ICONS.jutro;
+const afternoonIcon = APP_ICONS.poslijepodne;
+const eveningIcon = APP_ICONS.vecer;
+const restaurantIcon = APP_ICONS.restaurant;
+const cafeIcon = APP_ICONS.cafe;
+const clubIcon = APP_ICONS.club;
+const beachIcon = APP_ICONS.beach;
+const landmarkIcon = APP_ICONS.landmark;
+const opgIcon = APP_ICONS.opg;
+const accommodationIcon = APP_ICONS.accommodation;
+const marketIcon = APP_ICONS.market;
+const paintballIcon = APP_ICONS.paintball;
+const cinemaIcon = APP_ICONS.cinema;
+const parkIcon = APP_ICONS.park;
+const escapeRoomIcon = APP_ICONS.escapeRoom;
+const museumIcon = APP_ICONS.museum;
+const theaterIcon = APP_ICONS.theater;
+const mountainIcon = APP_ICONS.mountain;
+const nationalParkIcon = APP_ICONS.nationalPark;
+const caveIcon = APP_ICONS.cave;
+const spaIcon = APP_ICONS.spa;
 const putnikIcon = require("../../assets/images/putnik.png");
 const maloletnikIcon = require("../../assets/images/maloletnik.png");
 const mladiIcon = require("../../assets/images/mladi.png");
@@ -190,6 +192,7 @@ const CATEGORY_ICONS: Record<string, any> = {
   nationalPark: nationalParkIcon,
   cave: caveIcon,
   spa: spaIcon,
+  other: APP_ICONS.other,
 };
 
 /**
