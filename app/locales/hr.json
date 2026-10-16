@@ -358,7 +358,11 @@
     "reportSentBody": "Prijava je poslana adminu. Provjerit ćemo podatak.",
     "reportFailed": "Prijava nije poslana. Provjeri vezu i pokušaj ponovno.",
     "emptyTitle": "Nema mjesta u ovom području",
-    "emptyBody": "Uključi još kategorija ili odzumiraj kartu da zahvatiš šire područje."
+    "emptyBody": "Uključi još kategorija ili odzumiraj kartu da zahvatiš šire područje.",
+    "filtersHint": "Odaberi radijus, doba dana i kategorije. Karta se osvježi kad zatvoriš ploču.",
+    "searchCategories": "Traži kategoriju…",
+    "noCategoryMatch": "Nema kategorije s tim imenom.",
+    "radiusUnit": "Radijus pretrage: {{km}} km"
   },
   "notif": {
     "unavailableTitle": "Obavijesti nisu dostupne",
@@ -1086,7 +1090,15 @@
     "titleFor": "Objave za {{place}} i okolicu",
     "rangeLabel": "Domet",
     "categoriesLabel": "Kategorije",
-    "from": "od {{place}}"
+    "from": "od {{place}}",
+    "hintTitle": "Što se događa u ovom kraju?",
+    "hintBody": "Ovdje vidiš objave i događaje drugih putnika oko središta karte. Odaberi domet, a po želji i kategoriju, pa pregledaj rezultate.",
+    "hintOk": "Razumijem",
+    "helpLabel": "Pomoć",
+    "allCategories": "Sve kategorije",
+    "searchCategories": "Traži kategoriju…",
+    "clearCats": "Očisti odabir",
+    "resultsCount": "Rezultata: {{count}}"
   },
   "media": {
     "permissionNeeded": "Dozvola je potrebna",

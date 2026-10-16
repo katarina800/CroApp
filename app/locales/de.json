@@ -361,7 +361,11 @@
     "reportSentBody": "Deine Meldung wurde an den Admin geschickt. Wir prüfen die Angabe.",
     "reportFailed": "Die Meldung wurde nicht gesendet. Prüfe deine Verbindung und versuch es erneut.",
     "emptyTitle": "Keine Orte in diesem Gebiet",
-    "emptyBody": "Schalte weitere Kategorien ein oder zoome heraus, um mehr abzudecken."
+    "emptyBody": "Schalte weitere Kategorien ein oder zoome heraus, um mehr abzudecken.",
+    "filtersHint": "Wähle Radius, Tageszeit und Kategorien. Die Karte aktualisiert sich, sobald du das Panel schließt.",
+    "searchCategories": "Kategorie suchen…",
+    "noCategoryMatch": "Keine Kategorie mit diesem Namen.",
+    "radiusUnit": "Suchradius: {{km}} km"
   },
   "password": {
     "minLength": "Min. 6 Zeichen",
@@ -1088,7 +1092,15 @@
     "titleFor": "Beiträge für {{place}} und Umgebung",
     "rangeLabel": "Umkreis",
     "categoriesLabel": "Kategorien",
-    "from": "von {{place}}"
+    "from": "von {{place}}",
+    "hintTitle": "Was ist hier los?",
+    "hintBody": "Hier siehst du Beiträge und Events anderer Reisender rund um die Kartenmitte. Wähle eine Reichweite und optional eine Kategorie und stöbere in den Ergebnissen.",
+    "hintOk": "Verstanden",
+    "helpLabel": "Hilfe",
+    "allCategories": "Alle Kategorien",
+    "searchCategories": "Kategorie suchen…",
+    "clearCats": "Auswahl löschen",
+    "resultsCount": "Ergebnisse: {{count}}"
   },
   "media": {
     "permissionNeeded": "Berechtigung erforderlich",

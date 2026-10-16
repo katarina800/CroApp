@@ -2059,17 +2059,17 @@ export function PlanMyDayModal({
                   {[
                     {
                       val: "opusteno" as PlanStyle,
-                      emoji: "😎",
+                      icon: APP_ICONS.styleRelaxed,
                       label: t("plan.styleRelaxed"),
                     },
                     {
                       val: "kulturno" as PlanStyle,
-                      emoji: "🧐",
+                      icon: APP_ICONS.styleCultural,
                       label: t("plan.styleCultural"),
                     },
                     {
                       val: "avantura" as PlanStyle,
-                      emoji: "🤩",
+                      icon: APP_ICONS.styleAdventure,
                       label: t("plan.styleAdventure"),
                     },
                   ].map((o) => (
@@ -2088,9 +2088,11 @@ export function PlanMyDayModal({
                       }}
                       onPress={() => setPlanStyle(o.val)}
                     >
-                      <Text style={{ fontSize: T.screen, marginBottom: 4 }}>
-                        {o.emoji}
-                      </Text>
+                      <Image
+                        source={o.icon}
+                        style={{ width: 44, height: 44, marginBottom: 6 }}
+                        resizeMode="contain"
+                      />
                       <Text
                         style={{
                           fontSize: T.meta,
@@ -2224,7 +2226,9 @@ export function PlanMyDayModal({
                               resizeMode="contain"
                             />
                           ) : (
-                            <Text style={{ fontSize: T.screen }}>{o.emoji}</Text>
+                            <Text style={{ fontSize: T.screen }}>
+                              {o.emoji}
+                            </Text>
                           )}
                           <View style={{ flex: 1 }}>
                             <Text

@@ -12,3 +12,8 @@ Nove ikone kategorija, doba dana, društva i prijevoza (chiselled-badge set, 32 
 
 Stare viking kovanice **nisu obrisane**: i dalje su u `assets/images/` (`jutro.png`, `restoran.png`, `auto.png` …).
 U `constants/icons.ts` nalaze se u `LEGACY_ICONS`. Povratak na njih: postavi `USE_LEGACY_ICONS = true`.
+
+## Dodano kasnije
+
+`style-relaxed`, `style-cultural`, `style-adventure` (stil putovanja u planu dana) i `map-locate`,
+`map-activities` (kontrole na karti). Stare verzije ovih ikona nikad nisu postojale, pa ih nema u `LEGACY_ICONS`.

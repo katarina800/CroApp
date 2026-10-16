@@ -23,6 +23,7 @@ import {
   Dimensions,
   FlatList,
   Image,
+  ImageSourcePropType,
   ImageBackground,
   KeyboardAvoidingView,
   Linking,
@@ -578,6 +579,36 @@ const EMOJIS: Record<string, string> = {
 
 const BOTTOM_NAV_HEIGHT = Platform.OS === "ios" ? 82 : 66;
 
+/** Jedna kontrola s desne strane karte: ikona + čitljiva oznaka (>=10px). */
+function MapCtrlButton({
+  icon,
+  label,
+  active,
+  onPress,
+}: {
+  icon: ImageSourcePropType;
+  label: string;
+  active?: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <TouchableOpacity
+      style={[UI_STYLES.mapCtrlBtn, active && UI_STYLES.mapCtrlBtnActive]}
+      onPress={onPress}
+      activeOpacity={0.75}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ selected: !!active }}
+    >
+      <Image source={icon} style={UI_STYLES.mapCtrlIcon} resizeMode="contain" />
+      <Text style={UI_STYLES.mapCtrlLabel} numberOfLines={1}>
+        {label}
+      </Text>
+      {active && <View style={UI_STYLES.mapCtrlActiveDot} />}
+    </TouchableOpacity>
+  );
+}
+
 const UI_STYLES = StyleSheet.create({
   // ── TOP BAR ────────────────────────────────────────────────────────────────
   topBar: {
@@ -714,52 +745,86 @@ const UI_STYLES = StyleSheet.create({
     position: "absolute",
     right: 12,
     top: Platform.OS === "ios" ? 202 : 178,
-    backgroundColor: "#fff",
+    width: 64,
+    backgroundColor: "rgba(26,46,21,0.94)",
     borderRadius: 18,
     paddingVertical: 6,
-    paddingHorizontal: 6,
-    gap: 0,
+    paddingHorizontal: 3,
+    alignItems: "center",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.16,
+    shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
     borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.06)",
+    borderColor: V.borderGreen,
   },
-  mapCtrlBtn: {
-    width: 46,
-    height: 46,
-    borderRadius: 12,
+  mapCtrlToggle: {
+    position: "absolute",
+    right: 12,
+    top: Platform.OS === "ios" ? 202 : 178,
+    width: 64,
+    height: 50,
+    backgroundColor: "rgba(26,46,21,0.94)",
+    borderRadius: 14,
     justifyContent: "center",
     alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: V.borderGreen,
+    zIndex: 10,
+  },
+  mapCtrlToggleChevron: {
+    fontSize: T.lead,
+    lineHeight: 20,
+    color: V.accentGold,
+    fontWeight: "700",
+  },
+  mapCtrlLabel: {
+    fontSize: 10.5,
+    color: V.silverBright,
+    fontWeight: "700",
+    textAlign: "center",
+    letterSpacing: 0.2,
+  },
+  mapCtrlBtn: {
+    width: 58,
+    paddingVertical: 4,
+    borderRadius: 12,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "transparent",
   },
   mapCtrlBtnActive: {
-    backgroundColor: "rgba(90,138,72,0.14)",
-  },
-  mapCtrlBtnVisited: {
-    backgroundColor: "rgba(52,199,89,0.14)",
+    backgroundColor: "rgba(110,158,92,0.22)",
+    borderColor: V.primary,
   },
   mapCtrlIcon: {
-    width: 28,
-    height: 28,
+    width: 38,
+    height: 38,
+    marginBottom: 1,
   },
   mapCtrlDivider: {
+    alignSelf: "stretch",
     height: 1,
-    backgroundColor: "#eeeeee",
-    marginHorizontal: 6,
+    backgroundColor: V.borderDim,
+    marginHorizontal: 8,
     marginVertical: 3,
   },
   mapCtrlActiveDot: {
     position: "absolute",
-    top: 7,
-    right: 7,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "#34c759",
+    top: 3,
+    right: 5,
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+    backgroundColor: V.accentGold,
     borderWidth: 1.5,
-    borderColor: "#fff",
+    borderColor: V.forestDeep,
   },
 
   // ── INFO BAR (loading / broj rezultata) ───────────────────────────────────
@@ -8985,6 +9050,9 @@ function BadgesModal({
 }
 
 const CELL_W = (SW - 32 - 4) / 2;
+// Ploča: 4 kategorije u redu (umjesto 2) — pola manje listanja.
+const CAT_GAP = 6;
+const CAT_CELL_W = Math.floor((SW - 32 - CAT_GAP * 3) / 4);
 const TIME_CATS: Record<string, string[]> = {
   jutro: ["cafe", "park", "landmark", "museum", "market"],
   poslijepodne: ["restaurant", "museum", "beach", "cinema", "opg", "market"],
@@ -9709,6 +9777,19 @@ export default function DashboardScreen() {
         placeCategories[id as keyof typeof placeCategories]?.color || "#7A8A75",
     }));
   }, [t]);
+  const [categoryQuery, setCategoryQuery] = useState("");
+  // Pretraga kategorija na ploči: bez obzira na velika/mala slova i dijakritike.
+  const visibleCategories = useMemo(() => {
+    const norm = (v: string) =>
+      v
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .trim();
+    const q = norm(categoryQuery);
+    const all = getAllCategories();
+    return q ? all.filter((c) => norm(c.name).includes(q)) : all;
+  }, [getAllCategories, categoryQuery]);
   const mapRef = useRef<MapView>(null);
   const permissionRequestInProgress = useRef(false);
   const hasShownPermissionAlert = useRef(false);
@@ -11440,46 +11521,25 @@ export default function DashboardScreen() {
         </View>
       )}
 
-      {/* Side panel - zamijenjene ikone */}
-      {/* Toggle gumb — uvijek vidljiv */}
+      {/* Kontrole karte (desno). Tamna "Vara" ploča s ikonama iz istog seta kao
+          ostatak aplikacije; bijela podloga je maknuta jer se isticala na karti. */}
       <TouchableOpacity
-        style={{
-          position: "absolute",
-          right: 12,
-          top: Platform.OS === "ios" ? 202 : 178,
-          backgroundColor: "#fff",
-          borderRadius: 14,
-          width: 46,
-          height: 46,
-          justifyContent: "center",
-          alignItems: "center",
-          shadowColor: "#000",
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.16,
-          shadowRadius: 8,
-          elevation: 8,
-          borderWidth: 1,
-          borderColor: "rgba(0,0,0,0.06)",
-          zIndex: 10,
-        }}
+        style={UI_STYLES.mapCtrlToggle}
         onPress={() => setShowMapCtrlPanel((v) => !v)}
+        activeOpacity={0.8}
+        accessibilityRole="button"
+        accessibilityLabel={
+          showMapCtrlPanel ? t("map.hideControls") : t("map.showControls")
+        }
       >
-        <Text style={{ fontSize: T.lead, color: "#555" }}>
+        <Text style={UI_STYLES.mapCtrlToggleChevron}>
           {showMapCtrlPanel ? "›" : "‹"}
         </Text>
-        <Text
-          style={{
-            fontSize: 8,
-            color: "#888",
-            fontWeight: "600",
-            marginTop: 1,
-          }}
-        >
+        <Text style={UI_STYLES.mapCtrlLabel} numberOfLines={1}>
           {showMapCtrlPanel ? t("map.hideControls") : t("map.showControls")}
         </Text>
       </TouchableOpacity>
 
-      {/* Glavni panel — prikazuje se samo kad je showMapCtrlPanel=true */}
       {showMapCtrlPanel && (
         <View
           style={[
@@ -11487,135 +11547,25 @@ export default function DashboardScreen() {
             { top: Platform.OS === "ios" ? 258 : 234 },
           ]}
         >
-          {/* Gumbi "Povećaj" i "Smanji" su maknuti — karta se zumira
-              prstima, pa su samo zauzimali dvije od pet stavki panela.
-              Ostaju tri stvari koje prst ne može: skoči na moju lokaciju,
-              radijus i prikaz posjećenog. */}
-
-          {/* Moja lokacija */}
-          <TouchableOpacity
-            style={UI_STYLES.mapCtrlBtn}
+          {/* Zumiranje je prstima, pa ostaju tri stvari koje prst ne može:
+              skok na moju lokaciju, radijus i prikaz posjećenog; uz njih
+              pregled aktivnosti u području koje gledaš. */}
+          <MapCtrlButton
+            icon={APP_ICONS.mapLocate}
+            label={t("map.locationBtn")}
             onPress={getCurrentLocation}
-          >
-            <View
-              style={{
-                width: 26,
-                height: 26,
-                justifyContent: "center",
-                alignItems: "center",
-              }}
-            >
-              <View
-                style={{
-                  width: 24,
-                  height: 24,
-                  borderRadius: 12,
-                  borderWidth: 2,
-                  borderColor: "#007AFF",
-                  justifyContent: "center",
-                  alignItems: "center",
-                }}
-              >
-                <View
-                  style={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: 4,
-                    backgroundColor: "#007AFF",
-                  }}
-                />
-              </View>
-              <View
-                style={{
-                  position: "absolute",
-                  top: -3,
-                  width: 0,
-                  height: 0,
-                  borderLeftWidth: 3,
-                  borderRightWidth: 3,
-                  borderBottomWidth: 5,
-                  borderLeftColor: "transparent",
-                  borderRightColor: "transparent",
-                  borderBottomColor: "#007AFF",
-                }}
-              />
-            </View>
-          </TouchableOpacity>
-          <Text
-            style={{
-              fontSize: 8,
-              color: "#888",
-              fontWeight: "600",
-              textAlign: "center",
-              marginBottom: 2,
-            }}
-          >
-            {t("map.locationBtn")}
-          </Text>
-
-          {/* Radijus */}
-          <TouchableOpacity
-            style={[
-              UI_STYLES.mapCtrlBtn,
-              showRadiusCircle && UI_STYLES.mapCtrlBtnActive,
-            ]}
+          />
+          <MapCtrlButton
+            icon={APP_ICONS.radius}
+            label={t("map.radiusBtn")}
+            active={showRadiusCircle}
             onPress={() => setShowRadiusCircle((v) => !v)}
-          >
-            <View
-              style={{
-                width: 26,
-                height: 26,
-                justifyContent: "center",
-                alignItems: "center",
-              }}
-            >
-              <View
-                style={{
-                  width: 24,
-                  height: 24,
-                  borderRadius: 12,
-                  borderWidth: 1.5,
-                  borderColor: showRadiusCircle ? "#5a8a48" : "#aaa",
-                }}
-              />
-              <View
-                style={{
-                  position: "absolute",
-                  width: 14,
-                  height: 14,
-                  borderRadius: 7,
-                  borderWidth: 1.5,
-                  borderColor: showRadiusCircle ? "#5a8a48" : "#aaa",
-                }}
-              />
-              <View
-                style={{
-                  position: "absolute",
-                  width: 4,
-                  height: 4,
-                  borderRadius: 2,
-                  backgroundColor: showRadiusCircle ? "#5a8a48" : "#aaa",
-                }}
-              />
-            </View>
-            {showRadiusCircle && <View style={UI_STYLES.mapCtrlActiveDot} />}
-          </TouchableOpacity>
-          <Text
-            style={{
-              fontSize: 8,
-              color: "#888",
-              fontWeight: "600",
-              textAlign: "center",
-              marginBottom: 2,
-            }}
-          >
-            {t("map.radiusBtn")}
-          </Text>
-
-          {/* Što se ovdje događa. Gleda se centar karte, pa radi i nakon
-              pretrage i nakon običnog pomicanja na drugi kraj. */}
-          <TouchableOpacity
-            style={UI_STYLES.mapCtrlBtn}
+          />
+          {/* Gleda se centar karte, pa radi i nakon pretrage i nakon
+              običnog pomicanja na drugi kraj. */}
+          <MapCtrlButton
+            icon={APP_ICONS.mapActivities}
+            label={t("map.activitiesBtn")}
             onPress={() => {
               const center = mapRegion ?? initialRegion;
               if (!center) return;
@@ -11627,75 +11577,14 @@ export default function DashboardScreen() {
                 longitude: center.longitude,
               });
             }}
-          >
-            <Text style={{ fontSize: T.title }}>📣</Text>
-          </TouchableOpacity>
-          <Text
-            style={{
-              fontSize: 8,
-              color: "#888",
-              fontWeight: "600",
-              textAlign: "center",
-              marginBottom: 2,
-            }}
-          >
-            {t("map.activitiesBtn")}
-          </Text>
-
+          />
           <View style={UI_STYLES.mapCtrlDivider} />
-
-          {/* Posjećena mjesta */}
-          <TouchableOpacity
-            style={[
-              UI_STYLES.mapCtrlBtn,
-              showOnlyVisited && UI_STYLES.mapCtrlBtnVisited,
-            ]}
+          <MapCtrlButton
+            icon={APP_ICONS.visited}
+            label={t("map.visitedBtn")}
+            active={showOnlyVisited}
             onPress={() => setShowOnlyVisited((v) => !v)}
-          >
-            <View
-              style={{
-                width: 26,
-                height: 26,
-                justifyContent: "center",
-                alignItems: "center",
-              }}
-            >
-              <View
-                style={{
-                  width: 24,
-                  height: 24,
-                  borderRadius: 12,
-                  borderWidth: 2,
-                  borderColor: showOnlyVisited ? "#34c759" : "#888",
-                  justifyContent: "center",
-                  alignItems: "center",
-                }}
-              >
-                <Text
-                  style={{
-                    fontSize: T.meta,
-                    color: showOnlyVisited ? "#34c759" : "#888",
-                    fontWeight: "700",
-                    lineHeight: 15,
-                  }}
-                >
-                  ✓
-                </Text>
-              </View>
-            </View>
-            {showOnlyVisited && <View style={UI_STYLES.mapCtrlActiveDot} />}
-          </TouchableOpacity>
-          <Text
-            style={{
-              fontSize: 8,
-              color: "#888",
-              fontWeight: "600",
-              textAlign: "center",
-              marginBottom: 2,
-            }}
-          >
-            {t("map.visitedBtn")}
-          </Text>
+          />
         </View>
       )}
 
@@ -11738,14 +11627,104 @@ export default function DashboardScreen() {
           </View>
 
           <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
-            {/* Doba dana */}
+            {/* Kratko objašnjenje — što ploča radi i kada se karta osvježi */}
             <View
               style={{
-                padding: 16,
-                borderBottomWidth: 1,
-                borderBottomColor: DC.borderDim,
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 10,
+                marginHorizontal: 16,
+                marginTop: 14,
+                padding: 12,
+                borderRadius: 12,
+                backgroundColor: DC.card,
+                borderWidth: 1,
+                borderColor: DC.borderDim,
               }}
             >
+              <Image
+                source={APP_ICONS.navSearch}
+                style={{ width: 34, height: 34 }}
+                resizeMode="contain"
+              />
+              <Text
+                style={{
+                  flex: 1,
+                  fontSize: T.meta,
+                  color: DC.textSub,
+                  lineHeight: 18,
+                }}
+              >
+                {t("map.filtersHint")}
+              </Text>
+            </View>
+
+            {/* 1. Radijus — jedan red, svi jednako široki */}
+            <View style={{ paddingHorizontal: 16, paddingTop: 18 }}>
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 8,
+                  marginBottom: 10,
+                }}
+              >
+                <Image
+                  source={APP_ICONS.radius}
+                  style={{ width: 28, height: 28 }}
+                  resizeMode="contain"
+                />
+                <Text
+                  style={{
+                    fontSize: T.body,
+                    fontWeight: "700",
+                    color: DC.textSub,
+                  }}
+                >
+                  {t("map.radius")}
+                </Text>
+              </View>
+              <View style={{ flexDirection: "row", gap: 6 }}>
+                {[1, 5, 10, 20, 50, 100].map((r) => {
+                  const active = radius === r;
+                  return (
+                    <TouchableOpacity
+                      key={r}
+                      style={{
+                        flex: 1,
+                        paddingVertical: 11,
+                        alignItems: "center",
+                        backgroundColor: active ? DC.cardHover : DC.card,
+                        borderRadius: 10,
+                        borderWidth: active ? 2 : 1,
+                        borderColor: active ? DC.border : DC.borderDim,
+                      }}
+                      onPress={() => setRadius(r)}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: active }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: T.meta,
+                          color: active ? DC.text : DC.textDim,
+                          fontWeight: active ? "800" : "500",
+                        }}
+                      >
+                        {r}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              <Text
+                style={{ fontSize: T.caption, color: DC.textDim, marginTop: 6 }}
+              >
+                {t("map.radiusUnit", { km: radius })}
+              </Text>
+            </View>
+
+            {/* 2. Doba dana — tri jednaka polja u redu */}
+            <View style={{ paddingHorizontal: 16, paddingTop: 18 }}>
               <Text
                 style={{
                   fontSize: T.body,
@@ -11756,7 +11735,7 @@ export default function DashboardScreen() {
               >
                 {t("map.timeOfDay")}
               </Text>
-              <View style={{ gap: 8 }}>
+              <View style={{ flexDirection: "row", gap: 8 }}>
                 {[
                   {
                     key: "jutro",
@@ -11778,89 +11757,62 @@ export default function DashboardScreen() {
                   },
                 ].map((tod) => {
                   const active = activeTimeOfDay === tod.key;
-
-                  // ⬆️ DODAJ OVE LINIJE ⬆️
                   return (
                     <TouchableOpacity
                       key={tod.key}
-                      style={[
-                        {
-                          backgroundColor: DC.card,
-                          borderRadius: 12,
-                          padding: 14,
-                          borderWidth: 1.5,
-                          borderColor: DC.borderDim,
-                          flexDirection: "row",
-                          alignItems: "center",
-                          gap: 12,
-                        },
-                        active && {
-                          backgroundColor: DC.cardHover,
-                          borderColor: DC.border,
-                        },
-                      ]}
+                      style={{
+                        flex: 1,
+                        alignItems: "center",
+                        paddingVertical: 10,
+                        paddingHorizontal: 4,
+                        borderRadius: 12,
+                        backgroundColor: active ? DC.cardHover : DC.card,
+                        borderWidth: active ? 2 : 1,
+                        borderColor: active ? DC.border : DC.borderDim,
+                      }}
                       onPress={() => applyTimeOfDay(tod.key)}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: active }}
                     >
                       <Image
                         source={tod.icon}
-                        style={{ width: 50, height: 50 }}
+                        style={{ width: 52, height: 52 }}
                         resizeMode="contain"
                       />
-                      <View style={{ flex: 1 }}>
-                        <Text
-                          style={{
-                            fontSize: T.body,
-                            fontWeight: "700",
-                            color: DC.text,
-                          }}
-                        >
-                          {tod.label}
-                        </Text>
-                        <Text
-                          style={{
-                            fontSize: T.meta,
-                            color: DC.textDim,
-                            marginTop: 3,
-                          }}
-                        >
-                          {tod.sub}
-                        </Text>
-                        {/* ⬇️ DODAJ OVAJ NOVI TEXT ⬇️ */}
-                      </View>
-                      {active && (
-                        <View
-                          style={{
-                            width: 22,
-                            height: 22,
-                            borderRadius: 11,
-                            backgroundColor: "#5a8a48",
-                            justifyContent: "center",
-                            alignItems: "center",
-                          }}
-                        >
-                          <Text
-                            style={{
-                              color: "#fff",
-                              fontSize: T.meta,
-                              fontWeight: "800",
-                            }}
-                          >
-                            ✓
-                          </Text>
-                        </View>
-                      )}
+                      <Text
+                        style={{
+                          fontSize: T.meta,
+                          fontWeight: "700",
+                          color: DC.text,
+                          marginTop: 4,
+                        }}
+                        numberOfLines={1}
+                      >
+                        {tod.label}
+                      </Text>
+                      <Text
+                        style={{
+                          fontSize: T.caption,
+                          color: DC.textDim,
+                          marginTop: 2,
+                          textAlign: "center",
+                        }}
+                        numberOfLines={2}
+                      >
+                        {tod.sub}
+                      </Text>
                     </TouchableOpacity>
                   );
                 })}
               </View>
             </View>
 
-            {/* Kategorije - VEĆ RADI S SLIKAMA */}
+            {/* 3. Kategorije — pretraga + gusta mreža 4 u redu (bez dugog listanja) */}
             <View
               style={{
                 paddingHorizontal: 16,
-                paddingTop: 12,
-                paddingBottom: 4,
+                paddingTop: 18,
+                paddingBottom: 14,
                 borderBottomWidth: 1,
                 borderBottomColor: DC.borderDim,
               }}
@@ -11870,7 +11822,7 @@ export default function DashboardScreen() {
                   flexDirection: "row",
                   justifyContent: "space-between",
                   alignItems: "center",
-                  marginBottom: 8,
+                  marginBottom: 10,
                 }}
               >
                 <Text
@@ -11881,9 +11833,11 @@ export default function DashboardScreen() {
                   }}
                 >
                   {t("map.categories")}
+                  {selectedTypes.length > 0 ? ` · ${selectedTypes.length}` : ""}
                 </Text>
                 {selectedTypes.length > 0 && (
                   <TouchableOpacity
+                    hitSlop={TAP_SLOP}
                     onPress={() => {
                       setSelectedTypes([]);
                       setActiveTimeOfDay(null);
@@ -11901,102 +11855,88 @@ export default function DashboardScreen() {
                   </TouchableOpacity>
                 )}
               </View>
-              <View
+              <TextInput
+                value={categoryQuery}
+                onChangeText={setCategoryQuery}
+                placeholder={t("map.searchCategories")}
+                placeholderTextColor={DC.textDim}
+                autoCorrect={false}
+                autoCapitalize="none"
+                returnKeyType="search"
+                clearButtonMode="while-editing"
                 style={{
-                  flexDirection: "row",
-                  flexWrap: "wrap",
-                  gap: 4,
-                }}
-              >
-                {getAllCategories().map((cat) => {
-                  const active = selectedTypes.includes(cat.id);
-                  return (
-                    <TouchableOpacity
-                      key={cat.id}
-                      style={{
-                        width: CELL_W,
-                        height: 130, // ← fiksna visina umjesto aspectRatio
-                        backgroundColor: active ? cat.color : DC.card,
-                        borderRadius: 12,
-                        justifyContent: "center",
-                        alignItems: "center",
-                        paddingHorizontal: 4,
-                        paddingVertical: 8,
-                        borderWidth: active ? 2 : 1,
-                        borderColor: active ? cat.color : DC.borderDim,
-                      }}
-                      onPress={() => toggleType(cat.id)}
-                    >
-                      <CategoryCoin
-                        id={cat.id}
-                        fallbackGlyph={cat.icon}
-                        size={96}
-                        style={{ marginBottom: 4 }}
-                      />
-                      <Text
-                        style={{
-                          fontSize: T.caption,
-                          fontWeight: "600",
-                          color: active ? "#fff" : DC.textSub,
-                          textAlign: "center",
-                        }}
-                        numberOfLines={2}
-                      >
-                        {cat.name}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
-
-            {/* Radijus */}
-            <View
-              style={{
-                padding: 16,
-                borderBottomWidth: 1,
-                borderBottomColor: DC.borderDim,
-              }}
-            >
-              <Text
-                style={{
+                  backgroundColor: DC.card,
+                  borderRadius: 10,
+                  borderWidth: 1,
+                  borderColor: DC.borderDim,
+                  paddingHorizontal: 12,
+                  paddingVertical: 10,
                   fontSize: T.body,
-                  fontWeight: "700",
-                  color: DC.textSub,
+                  color: DC.text,
                   marginBottom: 10,
                 }}
-              >
-                {t("map.radius")}
-              </Text>
-              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-                {[1, 5, 10, 20, 50, 100].map((r) => {
-                  const active = radius === r;
-                  return (
-                    <TouchableOpacity
-                      key={r}
-                      style={{
-                        paddingHorizontal: 16,
-                        paddingVertical: 9,
-                        backgroundColor: active ? DC.cardHover : DC.card,
-                        borderRadius: 8,
-                        borderWidth: 1,
-                        borderColor: active ? DC.border : DC.borderDim,
-                      }}
-                      onPress={() => setRadius(r)}
-                    >
-                      <Text
+              />
+              {visibleCategories.length === 0 ? (
+                <Text
+                  style={{
+                    color: DC.textDim,
+                    fontSize: T.meta,
+                    paddingVertical: 12,
+                  }}
+                >
+                  {t("map.noCategoryMatch")}
+                </Text>
+              ) : (
+                <View
+                  style={{
+                    flexDirection: "row",
+                    flexWrap: "wrap",
+                    gap: CAT_GAP,
+                  }}
+                >
+                  {visibleCategories.map((cat) => {
+                    const active = selectedTypes.includes(cat.id);
+                    return (
+                      <TouchableOpacity
+                        key={cat.id}
                         style={{
-                          fontSize: T.meta,
-                          color: active ? DC.text : DC.textDim,
-                          fontWeight: active ? "700" : "400",
+                          width: CAT_CELL_W,
+                          minHeight: 96,
+                          backgroundColor: active ? cat.color : DC.card,
+                          borderRadius: 12,
+                          justifyContent: "center",
+                          alignItems: "center",
+                          paddingHorizontal: 2,
+                          paddingVertical: 6,
+                          borderWidth: active ? 2 : 1,
+                          borderColor: active ? cat.color : DC.borderDim,
                         }}
+                        onPress={() => toggleType(cat.id)}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: active }}
                       >
-                        {r} km
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
+                        <CategoryCoin
+                          id={cat.id}
+                          fallbackGlyph={cat.icon}
+                          size={56}
+                          style={{ marginBottom: 3 }}
+                        />
+                        <Text
+                          style={{
+                            fontSize: 11,
+                            fontWeight: "600",
+                            color: active ? "#fff" : DC.textSub,
+                            textAlign: "center",
+                          }}
+                          numberOfLines={2}
+                        >
+                          {cat.name}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
             </View>
 
             {/* Dobne grupe */}
@@ -12278,16 +12218,25 @@ export default function DashboardScreen() {
                 ))}
               </View>
             )}
+          </ScrollView>
 
-            {/* Apply gumb */}
+          {/* Apply gumb — uvijek vidljiv, ne treba listati do dna */}
+          <View
+            style={{
+              padding: 12,
+              paddingBottom: Platform.OS === "ios" ? 28 : 14,
+              borderTopWidth: 1.5,
+              borderTopColor: DC.border,
+              backgroundColor: DC.bg,
+            }}
+          >
             <TouchableOpacity
               style={{
-                margin: 16,
                 backgroundColor: DC.cardHover,
                 borderRadius: 12,
                 borderWidth: 1.5,
                 borderColor: DC.border,
-                paddingVertical: 16,
+                paddingVertical: 15,
                 alignItems: "center",
               }}
               onPress={() => setShowFilterPanel(false)}
@@ -12300,7 +12249,7 @@ export default function DashboardScreen() {
                   : t("map.apply")}
               </Text>
             </TouchableOpacity>
-          </ScrollView>
+          </View>
         </View>
       </Modal>
 

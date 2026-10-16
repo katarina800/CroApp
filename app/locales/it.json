@@ -373,7 +373,11 @@
     "reportFailed": "La segnalazione non è stata inviata. Controlla la connessione e riprova.",
     "members": "Membri",
     "emptyTitle": "Nessun luogo in quest'area",
-    "emptyBody": "Attiva altre categorie o riduci lo zoom per coprire un'area più ampia."
+    "emptyBody": "Attiva altre categorie o riduci lo zoom per coprire un'area più ampia.",
+    "filtersHint": "Scegli raggio, momento della giornata e categorie. La mappa si aggiorna quando chiudi il pannello.",
+    "searchCategories": "Cerca categoria…",
+    "noCategoryMatch": "Nessuna categoria con questo nome.",
+    "radiusUnit": "Raggio di ricerca: {{km}} km"
   },
   "videos": {
     "title": "Video",
@@ -1089,7 +1093,15 @@
     "titleFor": "Post per {{place}} e dintorni",
     "rangeLabel": "Raggio",
     "categoriesLabel": "Categorie",
-    "from": "da {{place}}"
+    "from": "da {{place}}",
+    "hintTitle": "Cosa succede da queste parti?",
+    "hintBody": "Qui vedi i post e gli eventi di altri viaggiatori intorno al centro della mappa. Scegli un raggio e, se vuoi, una categoria, poi sfoglia i risultati.",
+    "hintOk": "Ho capito",
+    "helpLabel": "Aiuto",
+    "allCategories": "Tutte le categorie",
+    "searchCategories": "Cerca categoria…",
+    "clearCats": "Cancella selezione",
+    "resultsCount": "Risultati: {{count}}"
   },
   "media": {
     "permissionNeeded": "Autorizzazione necessaria",

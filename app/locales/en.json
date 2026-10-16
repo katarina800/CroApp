@@ -377,7 +377,11 @@
     "reportSentBody": "Your report was sent to the admin. We'll check it.",
     "reportFailed": "The report was not sent. Check your connection and try again.",
     "emptyTitle": "No places in this area",
-    "emptyBody": "Turn on more categories, or zoom out to cover a wider area."
+    "emptyBody": "Turn on more categories, or zoom out to cover a wider area.",
+    "filtersHint": "Choose a radius, time of day and categories. The map refreshes when you close this panel.",
+    "searchCategories": "Search categories…",
+    "noCategoryMatch": "No category with that name.",
+    "radiusUnit": "Search radius: {{km}} km"
   },
   "videos": {
     "title": "Videos",
@@ -1088,7 +1092,15 @@
     "titleFor": "Posts for {{place}} and the surrounding area",
     "rangeLabel": "Range",
     "categoriesLabel": "Categories",
-    "from": "from {{place}}"
+    "from": "from {{place}}",
+    "hintTitle": "What is happening around here?",
+    "hintBody": "See posts and events from other travellers around the centre of the map. Pick a range and, if you like, a category, then browse the results.",
+    "hintOk": "Got it",
+    "helpLabel": "Help",
+    "allCategories": "All categories",
+    "searchCategories": "Search categories…",
+    "clearCats": "Clear selection",
+    "resultsCount": "Results: {{count}}"
   },
   "media": {
     "permissionNeeded": "Permission needed",

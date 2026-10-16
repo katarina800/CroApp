@@ -27,6 +27,7 @@ import {
   Pressable,
   ScrollView,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -34,6 +35,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { API_BASE_URL } from "@/app/config/api";
 import { POST_CATEGORY_IDS } from "@/app/services/locationService";
+import { APP_ICONS, getIcon } from "../constants/icons";
 import { CloseButton } from "./CloseButton";
 import { MediaPager, PagerItem } from "./MediaPager";
 import { T } from "../styles/varaTheme";
@@ -74,6 +76,7 @@ const labelStyle = {
   paddingBottom: 4,
 };
 const STORAGE_RADIUS = "vara_area_radius_v1";
+const STORAGE_HINT = "vara_area_hint_seen_v1";
 
 function fullUrl(path?: string | null): string {
   if (!path) return "";
@@ -125,6 +128,11 @@ export function AreaActivitiesSheet({
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
   const [pagerAt, setPagerAt] = useState<number | null>(null);
+  // Objašnjenje što ova funkcija radi: pri prvom otvaranju je otvoreno, nakon
+  // "Razumijem" se pamti i skuplja; ostaje dostupno preko gumba "?".
+  const [showHint, setShowHint] = useState(false);
+  const [showCats, setShowCats] = useState(false);
+  const [catQuery, setCatQuery] = useState("");
   /**
    * Naziv mjesta za naslov.
    *
@@ -167,6 +175,17 @@ export function AreaActivitiesSheet({
       })
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    AsyncStorage.getItem(STORAGE_HINT)
+      .then((v) => setShowHint(v !== "1"))
+      .catch(() => setShowHint(true));
+  }, []);
+
+  const dismissHint = () => {
+    setShowHint(false);
+    AsyncStorage.setItem(STORAGE_HINT, "1").catch(() => {});
+  };
 
   const load = useCallback(async () => {
     if (!point) return;
@@ -290,23 +309,112 @@ export function AreaActivitiesSheet({
                     : t("area.title")}
                 </Text>
               </View>
+              {!showHint && (
+                <TouchableOpacity
+                  onPress={() => setShowHint(true)}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  accessibilityRole="button"
+                  accessibilityLabel={t("area.helpLabel")}
+                  style={{
+                    width: 34,
+                    height: 34,
+                    borderRadius: 17,
+                    borderWidth: 1.5,
+                    borderColor: "#5a8a48",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    marginRight: 10,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: "#cfe6c4",
+                      fontSize: T.body,
+                      fontWeight: "800",
+                    }}
+                  >
+                    ?
+                  </Text>
+                </TouchableOpacity>
+              )}
               <CloseButton onPress={onClose} tone="light" />
             </View>
 
-            {/* Domet.
-                flexGrow/flexShrink 0 uz zadanu visinu: bez toga vodoravni
-                popis u okomitom rasporedu dobije onoliko visine koliko
-                pretekne, pa su se natpisi ("5 km") vodoravno prepolovili. */}
+            {showHint && (
+              <View
+                style={{
+                  marginHorizontal: 16,
+                  marginBottom: 6,
+                  padding: 12,
+                  borderRadius: 14,
+                  backgroundColor: "#1f4024",
+                  borderWidth: 1,
+                  borderColor: "#5a8a48",
+                }}
+              >
+                <View
+                  style={{
+                    flexDirection: "row",
+                    gap: 10,
+                    alignItems: "center",
+                  }}
+                >
+                  <Image
+                    source={APP_ICONS.mapActivities}
+                    style={{ width: 44, height: 44 }}
+                    resizeMode="contain"
+                  />
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={{
+                        color: "#fff",
+                        fontSize: T.body,
+                        fontWeight: "800",
+                      }}
+                    >
+                      {t("area.hintTitle")}
+                    </Text>
+                    <Text
+                      style={{
+                        color: "#cfe0c6",
+                        fontSize: T.meta,
+                        lineHeight: 18,
+                        marginTop: 2,
+                      }}
+                    >
+                      {t("area.hintBody")}
+                    </Text>
+                  </View>
+                </View>
+                <TouchableOpacity
+                  onPress={dismissHint}
+                  style={{
+                    alignSelf: "flex-end",
+                    marginTop: 8,
+                    paddingHorizontal: 16,
+                    paddingVertical: 8,
+                    borderRadius: 10,
+                    backgroundColor: "#5a8a48",
+                  }}
+                  accessibilityRole="button"
+                >
+                  <Text
+                    style={{
+                      color: "#fff",
+                      fontSize: T.meta,
+                      fontWeight: "700",
+                    }}
+                  >
+                    {t("area.hintOk")}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Domet — pet jednako širokih polja u jednom retku. */}
             <Text style={labelStyle}>{t("area.rangeLabel")}</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={{ flexGrow: 0, flexShrink: 0, height: 44 }}
-              contentContainerStyle={{
-                paddingHorizontal: 18,
-                alignItems: "center",
-                gap: 8,
-              }}
+            <View
+              style={{ flexDirection: "row", gap: 6, paddingHorizontal: 16 }}
             >
               {RADIUS_OPTIONS.map((km) => {
                 const on = km === radiusKm;
@@ -314,20 +422,23 @@ export function AreaActivitiesSheet({
                   <TouchableOpacity
                     key={km}
                     onPress={() => chooseRadius(km)}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: on }}
                     style={{
-                      paddingHorizontal: 14,
-                      paddingVertical: 7,
-                      borderRadius: 16,
-                      borderWidth: 1,
-                      borderColor: on ? "#5a8a48" : "#2f5a33",
-                      backgroundColor: on ? "#5a8a48" : "transparent",
+                      flex: 1,
+                      paddingVertical: 9,
+                      alignItems: "center",
+                      borderRadius: 12,
+                      borderWidth: 1.5,
+                      borderColor: on ? "#8fd06a" : "#2f5a33",
+                      backgroundColor: on ? "#5a8a48" : "#1b3a20",
                     }}
                   >
                     <Text
                       style={{
                         color: on ? "#fff" : "#b6cfae",
                         fontSize: T.meta,
-                        fontWeight: "700",
+                        fontWeight: "800",
                       }}
                     >
                       {km} km
@@ -335,48 +446,181 @@ export function AreaActivitiesSheet({
                   </TouchableOpacity>
                 );
               })}
-            </ScrollView>
+            </View>
 
-            {/* Kategorije */}
-            <Text style={labelStyle}>{t("area.categoriesLabel")}</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={{ flexGrow: 0, flexShrink: 0, height: 42 }}
-              contentContainerStyle={{
-                paddingHorizontal: 18,
+            {/* Kategorije — zatvorene zauzimaju jedan redak, otvorene imaju
+                pretragu i mrežu s ikonama; više nema vodoravnog listanja. */}
+            <TouchableOpacity
+              onPress={() => setShowCats((v) => !v)}
+              accessibilityRole="button"
+              accessibilityState={{ expanded: showCats }}
+              style={{
+                flexDirection: "row",
                 alignItems: "center",
-                gap: 8,
+                justifyContent: "space-between",
+                marginHorizontal: 16,
+                marginTop: 12,
+                paddingHorizontal: 12,
+                paddingVertical: 10,
+                borderRadius: 12,
+                backgroundColor: "#1b3a20",
+                borderWidth: 1.5,
+                borderColor: selectedCats.length ? "#c9a227" : "#2f5a33",
               }}
             >
-              {POST_CATEGORY_IDS.map((id) => {
-                const on = selectedCats.includes(id);
-                return (
+              <View style={{ flex: 1, paddingRight: 8 }}>
+                <Text
+                  style={{
+                    color: "#8aa483",
+                    fontSize: T.caption,
+                    fontWeight: "700",
+                    textTransform: "uppercase",
+                    letterSpacing: 0.5,
+                  }}
+                >
+                  {t("area.categoriesLabel")}
+                </Text>
+                <Text
+                  style={{
+                    color: "#fff",
+                    fontSize: T.body,
+                    fontWeight: "700",
+                    marginTop: 2,
+                  }}
+                  numberOfLines={1}
+                >
+                  {selectedCats.length === 0
+                    ? t("area.allCategories")
+                    : selectedCats
+                        .map((id) =>
+                          t(`categories.${id}`, { defaultValue: id }),
+                        )
+                        .join(", ")}
+                </Text>
+              </View>
+              <Ionicons
+                name={showCats ? "chevron-up" : "chevron-down"}
+                size={22}
+                color="#cfe6c4"
+              />
+            </TouchableOpacity>
+
+            {showCats && (
+              <View style={{ marginHorizontal: 16, marginTop: 8 }}>
+                <TextInput
+                  value={catQuery}
+                  onChangeText={setCatQuery}
+                  placeholder={t("area.searchCategories")}
+                  placeholderTextColor="#7d9a76"
+                  autoCorrect={false}
+                  autoCapitalize="none"
+                  clearButtonMode="while-editing"
+                  style={{
+                    backgroundColor: "#0f2412",
+                    borderRadius: 10,
+                    borderWidth: 1,
+                    borderColor: "#2f5a33",
+                    paddingHorizontal: 12,
+                    paddingVertical: 9,
+                    color: "#fff",
+                    fontSize: T.body,
+                    marginBottom: 8,
+                  }}
+                />
+                <ScrollView
+                  style={{ maxHeight: 200 }}
+                  keyboardShouldPersistTaps="handled"
+                  nestedScrollEnabled
+                >
+                  <View
+                    style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}
+                  >
+                    {POST_CATEGORY_IDS.filter((id) => {
+                      const q = catQuery
+                        .normalize("NFD")
+                        .replace(/[\u0300-\u036f]/g, "")
+                        .toLowerCase()
+                        .trim();
+                      if (!q) return true;
+                      return t(`categories.${id}`, { defaultValue: id })
+                        .normalize("NFD")
+                        .replace(/[\u0300-\u036f]/g, "")
+                        .toLowerCase()
+                        .includes(q);
+                    }).map((id) => {
+                      const on = selectedCats.includes(id);
+                      const icon = getIcon(id);
+                      return (
+                        <TouchableOpacity
+                          key={id}
+                          onPress={() => toggleCat(id)}
+                          accessibilityRole="button"
+                          accessibilityState={{ selected: on }}
+                          style={{
+                            flexDirection: "row",
+                            alignItems: "center",
+                            gap: 6,
+                            paddingLeft: 4,
+                            paddingRight: 10,
+                            paddingVertical: 4,
+                            borderRadius: 16,
+                            borderWidth: 1.5,
+                            borderColor: on ? "#c9a227" : "#2f5a33",
+                            backgroundColor: on ? "#c9a22733" : "#1b3a20",
+                          }}
+                        >
+                          {icon && (
+                            <Image
+                              source={icon}
+                              style={{ width: 28, height: 28 }}
+                              resizeMode="contain"
+                            />
+                          )}
+                          <Text
+                            style={{
+                              color: on ? "#f2d78a" : "#b6cfae",
+                              fontSize: T.meta,
+                              fontWeight: "600",
+                            }}
+                          >
+                            {t(`categories.${id}`, { defaultValue: id })}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </ScrollView>
+                {selectedCats.length > 0 && (
                   <TouchableOpacity
-                    key={id}
-                    onPress={() => toggleCat(id)}
-                    style={{
-                      paddingHorizontal: 12,
-                      paddingVertical: 6,
-                      borderRadius: 14,
-                      borderWidth: 1,
-                      borderColor: on ? "#c9a227" : "#2f5a33",
-                      backgroundColor: on ? "#c9a22733" : "transparent",
-                    }}
+                    onPress={() => setSelectedCats([])}
+                    style={{ alignSelf: "flex-start", paddingVertical: 8 }}
                   >
                     <Text
                       style={{
-                        color: on ? "#f2d78a" : "#9fbc96",
+                        color: "#f2d78a",
                         fontSize: T.meta,
-                        fontWeight: "600",
+                        fontWeight: "700",
                       }}
                     >
-                      {t(`categories.${id}`, { defaultValue: id })}
+                      {t("area.clearCats")}
                     </Text>
                   </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
+                )}
+              </View>
+            )}
+
+            {!loading && (
+              <Text
+                style={{
+                  color: "#8aa483",
+                  fontSize: T.meta,
+                  paddingHorizontal: 18,
+                  paddingTop: 10,
+                }}
+              >
+                {t("area.resultsCount", { count: shown.length })}
+              </Text>
+            )}
 
             {loading ? (
               <ActivityIndicator style={{ marginTop: 40 }} color="#8fd06a" />

@@ -373,7 +373,11 @@
     "reportFailed": "Le signalement n'a pas été envoyé. Vérifie ta connexion et réessaie.",
     "members": "Membres",
     "emptyTitle": "Aucun lieu dans cette zone",
-    "emptyBody": "Active d'autres catégories ou dézoome pour couvrir une zone plus large."
+    "emptyBody": "Active d'autres catégories ou dézoome pour couvrir une zone plus large.",
+    "filtersHint": "Choisis un rayon, un moment de la journée et des catégories. La carte se met à jour quand tu fermes ce panneau.",
+    "searchCategories": "Rechercher une catégorie…",
+    "noCategoryMatch": "Aucune catégorie de ce nom.",
+    "radiusUnit": "Rayon de recherche : {{km}} km"
   },
   "videos": {
     "title": "Vidéos",
@@ -1089,7 +1093,15 @@
     "titleFor": "Publications pour {{place}} et les environs",
     "rangeLabel": "Rayon",
     "categoriesLabel": "Catégories",
-    "from": "de {{place}}"
+    "from": "de {{place}}",
+    "hintTitle": "Que se passe-t-il par ici ?",
+    "hintBody": "Retrouve ici les publications et événements d’autres voyageurs autour du centre de la carte. Choisis un rayon et, si tu veux, une catégorie, puis parcours les résultats.",
+    "hintOk": "Compris",
+    "helpLabel": "Aide",
+    "allCategories": "Toutes les catégories",
+    "searchCategories": "Rechercher une catégorie…",
+    "clearCats": "Effacer la sélection",
+    "resultsCount": "Résultats : {{count}}"
   },
   "media": {
     "permissionNeeded": "Autorisation requise",

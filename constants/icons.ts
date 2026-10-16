@@ -75,7 +75,14 @@ export type IconKey =
   | "ageAdults"
   | "ageRetired"
   // oznaka korisnika na karti
-  | "traveller";
+  | "traveller"
+  // stil putovanja
+  | "styleRelaxed"
+  | "styleCultural"
+  | "styleAdventure"
+  // kontrole karte (nova ikona, stare nema)
+  | "mapLocate"
+  | "mapActivities";
 
 export const NEW_ICONS: Record<IconKey, ImageSourcePropType> = {
   jutro: require("../assets/images/icons/time-morning.png"),
@@ -133,10 +140,16 @@ export const NEW_ICONS: Record<IconKey, ImageSourcePropType> = {
   ageAdults: require("../assets/images/icons/age-adults.png"),
   ageRetired: require("../assets/images/icons/age-retired.png"),
   traveller: require("../assets/images/icons/map-traveller.png"),
+  styleRelaxed: require("../assets/images/icons/style-relaxed.png"),
+  styleCultural: require("../assets/images/icons/style-cultural.png"),
+  styleAdventure: require("../assets/images/icons/style-adventure.png"),
+  mapLocate: require("../assets/images/icons/map-locate.png"),
+  mapActivities: require("../assets/images/icons/map-activities.png"),
 };
 
 /**
- * Stare ikone, nepromijenjene. "Ostalo" nikad nije imalo ikonu (ekran je crtao emoji u
+ * Stare ikone, nepromijenjene. Stil putovanja i kontrole karte (locate/activities) nikad nisu
+ * imali ikonu, pa ih ovdje nema. "Ostalo" nikad nije imalo ikonu (ekran je crtao emoji u
  * kovanici), pa ga ovdje nema — u starom načinu ostaje isto kao prije.
  */
 export const LEGACY_ICONS: Partial<Record<IconKey, ImageSourcePropType>> = {
