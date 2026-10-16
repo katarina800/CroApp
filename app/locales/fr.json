@@ -1002,7 +1002,8 @@
     "actClub": "Sortie nocturne",
     "anonymous": "Utilisateur anonyme",
     "travelFromPrevious": "{{min}} min depuis l'arrêt précédent",
-    "firstStop": "Premier arrêt"
+    "firstStop": "Premier arrêt",
+    "noVenues": "Impossible de charger les lieux de cette ville pour le moment. Le service est temporairement surchargé ou le rayon est trop petit. Patientez une minute puis réessayez, ou augmentez le rayon."
   },
   "story": {
     "myStory": "Mon story",

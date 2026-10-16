@@ -977,7 +977,8 @@
     "actClub": "Night out",
     "anonymous": "Anonymous user",
     "travelFromPrevious": "{{min}} min from the previous stop",
-    "firstStop": "First stop"
+    "firstStop": "First stop",
+    "noVenues": "We couldn't load places for that city right now. The service that provides them is temporarily busy, or the radius is too small. Wait a minute and try again, or increase the radius."
   },
   "schedBreakfast": "Breakfast",
   "schedMorningTour": "Morning sightseeing — least tourist traffic",

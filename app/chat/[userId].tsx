@@ -38,6 +38,7 @@ import {
 import { API_BASE_URL } from "../config/api";
 import i18n from "../config/i18n";
 import { useActivePolling } from "@/hooks/use-active-polling";
+import { useKeyboardOverlap } from "@/hooks/use-keyboard-offset";
 import { CloseButton } from "@/components/CloseButton";
 import { T } from "../../styles/varaTheme";
 
@@ -941,6 +942,11 @@ export default function ChatScreen() {
     ? getInitials(otherUserInfo.firstName, otherUserInfo.lastName)
     : (displayName?.[0]?.toUpperCase() ?? "?");
 
+  // Tipkovnica ne smije prekriti polje za unos: mjeri se koliko stvarno prekriva
+  // dno ovog prikaza i toliko se podigne (vidi hooks/use-keyboard-offset).
+  const keyboardAreaRef = useRef<View>(null);
+  const keyboardOverlap = useKeyboardOverlap(keyboardAreaRef);
+
   // ─── UI ──────────────────────────────────────────────────────────────────────
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
@@ -982,103 +988,111 @@ export default function ChatScreen() {
         </TouchableOpacity>
       )}
 
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        // FIX: na Androidu je ovdje stajao behavior="height". Aplikacija radi u
-        // edge-to-edge načinu i sustav sam smanjuje prozor kad se otvori tipkovnica,
-        // pa je KeyboardAvoidingView smanjivao visinu JOŠ JEDNOM. Dvije se prilagodbe
-        // natežu oko visine ekrana kroz cijelu animaciju tipkovnice, što se vidi kao
-        // neprekidno treperenje/vibriranje cijelog ekrana. Na Androidu zato nema
-        // behaviora — sustav to odradi sam. (Unutar <Modal>-a KeyboardAvoidingView
-        // ionako ne radi jer je modal zaseban prozor bez adjustResize; ondje se
-        // koristi useInputBottomOffset iz hooks/use-keyboard-offset.)
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
+      <View
+        ref={keyboardAreaRef}
+        collapsable={false}
+        style={{ flex: 1, paddingBottom: keyboardOverlap }}
       >
-        {loading ? (
-          <View style={styles.center}>
-            <ActivityIndicator size="large" color={V.visited} />
-            <Text style={styles.loadingText}>Učitavanje razgovora...</Text>
-          </View>
-        ) : (
-          <FlatList
-            ref={flatListRef}
-            data={messages}
-            keyExtractor={(item) => item.id.toString()}
-            renderItem={renderMessage}
-            contentContainerStyle={[
-              styles.messagesList,
-              messages.length === 0 && styles.emptyList,
-            ]}
-            onContentSizeChange={() =>
-              flatListRef.current?.scrollToEnd({ animated: false })
-            }
-            ListEmptyComponent={
-              <View style={styles.emptyState}>
-                <Ionicons
-                  name="chatbubble-ellipses-outline"
-                  size={56}
-                  color={V.borderGreen}
-                />
-                <Text style={styles.emptyTitle}>Nema poruka</Text>
-                <Text style={styles.emptySubtitle}>
-                  Pošalji prvu poruku korisniku {displayName}!
-                </Text>
-              </View>
-            }
-          />
-        )}
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          // FIX: na Androidu je ovdje stajao behavior="height". Aplikacija radi u
+          // edge-to-edge načinu i sustav sam smanjuje prozor kad se otvori tipkovnica,
+          // pa je KeyboardAvoidingView smanjivao visinu JOŠ JEDNOM. Dvije se prilagodbe
+          // natežu oko visine ekrana kroz cijelu animaciju tipkovnice, što se vidi kao
+          // neprekidno treperenje/vibriranje cijelog ekrana. Na Androidu zato nema
+          // behaviora — sustav to odradi sam. (Unutar <Modal>-a KeyboardAvoidingView
+          // ionako ne radi jer je modal zaseban prozor bez adjustResize; ondje se
+          // koristi useInputBottomOffset iz hooks/use-keyboard-offset.)
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
+        >
+          {loading ? (
+            <View style={styles.center}>
+              <ActivityIndicator size="large" color={V.visited} />
+              <Text style={styles.loadingText}>Učitavanje razgovora...</Text>
+            </View>
+          ) : (
+            <FlatList
+              ref={flatListRef}
+              data={messages}
+              keyExtractor={(item) => item.id.toString()}
+              renderItem={renderMessage}
+              contentContainerStyle={[
+                styles.messagesList,
+                messages.length === 0 && styles.emptyList,
+              ]}
+              onContentSizeChange={() =>
+                flatListRef.current?.scrollToEnd({ animated: false })
+              }
+              ListEmptyComponent={
+                <View style={styles.emptyState}>
+                  <Ionicons
+                    name="chatbubble-ellipses-outline"
+                    size={56}
+                    color={V.borderGreen}
+                  />
+                  <Text style={styles.emptyTitle}>Nema poruka</Text>
+                  <Text style={styles.emptySubtitle}>
+                    Pošalji prvu poruku korisniku {displayName}!
+                  </Text>
+                </View>
+              }
+            />
+          )}
 
-        {/* ── Input area ── */}
-        <View style={styles.inputArea}>
-          <TouchableOpacity
-            style={styles.mediaBtn}
-            onPress={() => pickMedia("gallery")}
-            disabled={sendingMedia}
-            accessibilityRole="button"
-            accessibilityLabel={t("media.attach")}
-          >
-            <Ionicons name="images-outline" size={22} color={V.visited} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.mediaBtn}
-            onPress={() => pickMedia("camera")}
-            disabled={sendingMedia}
-          >
-            <Ionicons name="camera-outline" size={22} color={V.visited} />
-          </TouchableOpacity>
-          <TextInput
-            ref={inputRef}
-            style={styles.textInput}
-            placeholder={t("chat.messagePlaceholder", { name: displayName })}
-            placeholderTextColor={V.silverDim}
-            value={inputText}
-            onChangeText={setInputText}
-            multiline
-            maxLength={1000}
-          />
-          <TouchableOpacity
-            style={[
-              styles.sendBtn,
-              (!inputText.trim() && !mediaPreview) || sending
-                ? styles.sendBtnDisabled
-                : null,
-            ]}
-            onPress={inputText.trim() ? handleSend : () => pickMedia("gallery")}
-            disabled={(!inputText.trim() && !mediaPreview) || sending}
-          >
-            {sending ? (
-              <ActivityIndicator size="small" color={V.silverBright} />
-            ) : (
-              <Ionicons
-                name={inputText.trim() ? "send" : "send-outline"}
-                size={18}
-                color={V.silverBright}
-              />
-            )}
-          </TouchableOpacity>
-        </View>
-      </KeyboardAvoidingView>
+          {/* ── Input area ── */}
+          <View style={styles.inputArea}>
+            <TouchableOpacity
+              style={styles.mediaBtn}
+              onPress={() => pickMedia("gallery")}
+              disabled={sendingMedia}
+              accessibilityRole="button"
+              accessibilityLabel={t("media.attach")}
+            >
+              <Ionicons name="images-outline" size={22} color={V.visited} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.mediaBtn}
+              onPress={() => pickMedia("camera")}
+              disabled={sendingMedia}
+            >
+              <Ionicons name="camera-outline" size={22} color={V.visited} />
+            </TouchableOpacity>
+            <TextInput
+              ref={inputRef}
+              style={styles.textInput}
+              placeholder={t("chat.messagePlaceholder", { name: displayName })}
+              placeholderTextColor={V.silverDim}
+              value={inputText}
+              onChangeText={setInputText}
+              multiline
+              maxLength={1000}
+            />
+            <TouchableOpacity
+              style={[
+                styles.sendBtn,
+                (!inputText.trim() && !mediaPreview) || sending
+                  ? styles.sendBtnDisabled
+                  : null,
+              ]}
+              onPress={
+                inputText.trim() ? handleSend : () => pickMedia("gallery")
+              }
+              disabled={(!inputText.trim() && !mediaPreview) || sending}
+            >
+              {sending ? (
+                <ActivityIndicator size="small" color={V.silverBright} />
+              ) : (
+                <Ionicons
+                  name={inputText.trim() ? "send" : "send-outline"}
+                  size={18}
+                  color={V.silverBright}
+                />
+              )}
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </View>
 
       {/* ── Media Preview Modal ── */}
       <Modal

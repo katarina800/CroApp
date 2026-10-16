@@ -63,7 +63,6 @@ import {
 } from "@/components/AreaActivitiesSheet";
 import {
   POST_CATEGORY_IDS,
-  clearPlacesCache,
   geocodeCity,
   getPlacesInRadius,
   nameMatchesDenylist,
@@ -5265,8 +5264,6 @@ async function fetchVenuesNearCity(
   const geocoded = await geocodeCity(cityQuery);
   if (!geocoded) return { geocoded: null, venues: {} };
 
-  clearPlacesCache();
-
   // UVIJEK traži sve relevantne kategorije, interests samo određuju prioritet
   const allCats = [
     "restaurant",
@@ -9746,6 +9743,10 @@ export default function DashboardScreen() {
   // Broj koji se prikazuje na karti
   const [displayLimit, setDisplayLimit] = useState(INITIAL_RESULTS_LIMIT);
   const [isLoadingPlaces, setIsLoadingPlaces] = useState(false);
+  // Oznaka tekućeg učitavanja mjesta. Odgovori stižu proizvoljnim redom (osobito
+  // kad su javni servisi spori ili ograničavaju zahtjeve): kasni odgovor za
+  // STARU lokaciju ili radijus ne smije prebrisati prikaz za novu.
+  const placesRequestRef = useRef(0);
   const [activeTimeOfDay, setActiveTimeOfDay] = useState<string | null>(null);
 
   const [todHint, setTodHint] = useState<string | null>(null);
@@ -10067,6 +10068,7 @@ export default function DashboardScreen() {
   // PRONAĐI useEffect koji resetira displayLimit:
   useEffect(() => {
     if (!activeSearchLoc || selectedTypes.length === 0 || showOnlyVisited) {
+      placesRequestRef.current++; // poništi upit koji je možda još u tijeku
       setAllPlaces([]);
       return;
     }
@@ -10272,7 +10274,8 @@ export default function DashboardScreen() {
         longitude: result.longitude,
       });
       setSearchLocationName(result.displayName);
-      clearPlacesCache();
+      // Predmemorija se ne briše: ključ sadrži koordinate, pa se nova lokacija
+      // ionako učitava svježe, a brisanje bi bacilo i sve ostalo učitano.
       const region = {
         latitude: result.latitude,
         longitude: result.longitude,
@@ -10296,7 +10299,6 @@ export default function DashboardScreen() {
     setSearchLocation(null);
     setSearchLocationName("");
     setCityQuery("");
-    clearPlacesCache();
     setAllPlaces([]); // ← NOVO: očisti stare rezultate
     if (userLocation) {
       const region = {
@@ -10311,6 +10313,7 @@ export default function DashboardScreen() {
 
   const loadPlacesInRadius = async () => {
     if (!activeSearchLoc || selectedTypes.length === 0) return;
+    const reqId = ++placesRequestRef.current;
     setIsLoadingPlaces(true);
     try {
       // 1. Pokušaj Google Places Nearby Search (precizniji, ima McDonald's itd.)
@@ -10333,6 +10336,10 @@ export default function DashboardScreen() {
         radius,
         selectedTypes as any,
       );
+
+      // Za ovo vrijeme je stigao noviji upit (druga lokacija, radijus ili
+      // kategorije): ovaj rezultat je zastario i ne prikazuje se.
+      if (reqId !== placesRequestRef.current) return;
 
       // 3. Spoji oba izvora, dedupliciraj
       // 3. Spoji oba izvora, dedupliciraj (nova logika - po imenu + udaljenosti)
@@ -10762,7 +10769,9 @@ export default function DashboardScreen() {
     } catch (e) {
       console.error(e);
     } finally {
-      setIsLoadingPlaces(false);
+      // Samo najnoviji upit gasi pokazivač učitavanja; zastarjeli ga ostavlja
+      // da radi dok traje onaj koji je stvarno aktivan.
+      if (reqId === placesRequestRef.current) setIsLoadingPlaces(false);
     }
   };
 

@@ -34,7 +34,6 @@ import { AreaActivitiesSheet } from "./AreaActivitiesSheet";
 import { API_BASE_URL } from "../app/config/api"; // prilagodi putanju
 
 import {
-  clearPlacesCache,
   geocodeCity,
   getPlacesInRadius,
   Place,
@@ -782,7 +781,9 @@ async function fetchVenuesNearCity(
 }> {
   const geocoded = await geocodeCity(cityQuery);
   if (!geocoded) return { geocoded: null, venues: {} };
-  clearPlacesCache();
+  // Predmemorija se NE briše: dijeli je glavna karta, a ključ već sadrži
+  // koordinate, radijus i kategorije, pa stari zapisi ne smetaju. Brisanje je
+  // pri svakom planu bacalo i sve što je karta već učitala.
 
   const allCats = [
     "restaurant",
@@ -1182,6 +1183,20 @@ export function PlanMyDayModal({
 
   const [loadingStep, setLoadingStep] = useState(0);
   const loadingInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Generiranje: jedan pokušaj odjednom, i oznaka tekućeg pokušaja. Bez toga je
+  // drugi dodir (ili ponovno generiranje) pokretao paralelni upit, a prvi je
+  // interval za animaciju učitavanja ostajao živ zauvijek — modal se tada
+  // ponovno iscrtavao svake 2 sekunde i usporavao kartu i sve ostalo.
+  const generatingRef = useRef(false);
+  const generationIdRef = useRef(0);
+
+  useEffect(
+    () => () => {
+      generationIdRef.current++;
+      if (loadingInterval.current) clearInterval(loadingInterval.current);
+    },
+    [],
+  );
   const [localVisitedIds, setLocalVisitedIds] = useState<Set<string>>(
     new Set(),
   );
@@ -1317,6 +1332,9 @@ export function PlanMyDayModal({
     setSpontaneous(false);
     setDestination("");
     setNumDays(1);
+    // Zatvaranje prekida tekuće generiranje: njegov kasni odgovor se odbacuje.
+    generationIdRef.current++;
+    generatingRef.current = false;
     if (loadingInterval.current) clearInterval(loadingInterval.current);
   };
 
@@ -1438,9 +1456,16 @@ export function PlanMyDayModal({
       return;
     }
 
+    // Već traje: drugi dodir ne smije pokrenuti paralelni upit.
+    if (generatingRef.current) return;
+    generatingRef.current = true;
+    const runId = ++generationIdRef.current;
+
     setLoadingStep(0);
     setStep("loading");
 
+    // Prethodni interval se uvijek ugasi prije novog (inače curi).
+    if (loadingInterval.current) clearInterval(loadingInterval.current);
     loadingInterval.current = setInterval(() => {
       setLoadingStep((prev) => (prev + 1) % LOADING_MESSAGES.length);
     }, 2000);
@@ -1452,6 +1477,23 @@ export function PlanMyDayModal({
         activityRadius ?? 5, // fallback na 5km ako nije odabrano
         interests,
       );
+
+      // Modal je u međuvremenu zatvoren ili je pokrenut novi pokušaj.
+      if (runId !== generationIdRef.current) return;
+
+      // Nema ni jednog mjesta: prije se ovdje ipak "gradio" prazan plan i
+      // prikazivao kao uspjeh. Najčešće je uzrok privremen (servisi s kojih se
+      // mjesta dohvaćaju su preopterećeni), pa korisnik dobiva jasan savjet i
+      // ostaje na formi da može odmah ponoviti.
+      if (!geocoded || Object.keys(venues).length === 0) {
+        if (loadingInterval.current) clearInterval(loadingInterval.current);
+        Alert.alert(
+          t("plan.destination"),
+          geocoded ? t("plan.noVenues") : t("plan.planError"),
+        );
+        setStep("form");
+        return;
+      }
 
       setAllVenues(venues);
       setGeocodedCoords(
@@ -1504,9 +1546,13 @@ export function PlanMyDayModal({
 
       setStep("result");
     } catch (err) {
+      if (runId !== generationIdRef.current) return;
       if (loadingInterval.current) clearInterval(loadingInterval.current);
       Alert.alert(t("common.error"), t("plan.planError"));
       setStep("form");
+    } finally {
+      // Samo tekući pokušaj otpušta "zaključavanje"; zastarjeli ga ne dira.
+      if (runId === generationIdRef.current) generatingRef.current = false;
     }
   }, [
     destination,
@@ -1515,6 +1561,10 @@ export function PlanMyDayModal({
     interests,
     spontaneous,
     numDays,
+    // planStyle je nedostajao: povratni poziv je pamtio STARI stil pa je plan
+    // bio generiran s prethodno odabranim, a ne s trenutnim.
+    planStyle,
+    t,
   ]);
 
   /**

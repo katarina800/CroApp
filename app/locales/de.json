@@ -951,7 +951,8 @@
     "actClub": "Abend im Club",
     "anonymous": "Anonymer Nutzer",
     "travelFromPrevious": "{{min}} Min. von der vorigen Station",
-    "firstStop": "Erste Station"
+    "firstStop": "Erste Station",
+    "noVenues": "Für diese Stadt konnten wir gerade keine Orte laden. Der Dienst ist vorübergehend überlastet oder der Radius ist zu klein. Warten Sie eine Minute und versuchen Sie es erneut, oder vergrößern Sie den Radius."
   },
   "story": {
     "myStory": "Meine Story",

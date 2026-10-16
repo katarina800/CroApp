@@ -1031,11 +1031,103 @@ const GLOBAL_NAME_DENYLIST = [
 // ─── Cache ────────────────────────────────────────────────────────────────────
 let placesCache: Map<string, { places: Place[]; timestamp: number }> =
   new Map();
-const CACHE_DURATION = 5 * 60 * 1000;
+const CACHE_DURATION = 15 * 60 * 1000;
 
 export const clearPlacesCache = () => {
   placesCache.clear();
 };
+
+// ─── Ograničavač zahtjeva prema javnim OSM poslužiteljima ─────────────────────
+//
+// Overpass i Nominatim su besplatni javni servisi s ograničenjem po IP adresi
+// (Nominatim: najviše 1 zahtjev u sekundi). Plan putovanja je za SVAKO
+// generiranje slao do 17 upita Overpassu istodobno i do 17 Nominatimu —
+// nakon nekoliko generiranja adresa bi bila privremeno blokirana, pa su
+// zakazivali i sljedeći planovi i SVE na glavnoj karti (isti servisi, ista
+// adresa): plan bez mjesta, karta bez mjesta, pretraga bez rezultata.
+//
+// Zato svi upiti idu kroz red: Overpass najviše 2 odjednom, Nominatim jedan po
+// jedan s razmakom. Pretraga koju je korisnik upravo pokrenuo ima prednost
+// pred pozadinskim punjenjem.
+type QueueJob = {
+  run: () => Promise<unknown>;
+  resolve: (v: any) => void;
+  reject: (e: any) => void;
+};
+
+function createLimiter(maxConcurrent: number, minGapMs: number) {
+  const queue: QueueJob[] = [];
+  let active = 0;
+  let lastStart = 0;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+
+  const pump = () => {
+    if (timer || active >= maxConcurrent || queue.length === 0) return;
+    const wait = Math.max(0, lastStart + minGapMs - Date.now());
+    if (wait > 0) {
+      timer = setTimeout(() => {
+        timer = null;
+        pump();
+      }, wait);
+      return;
+    }
+    const job = queue.shift()!;
+    active++;
+    lastStart = Date.now();
+    job
+      .run()
+      .then(job.resolve, job.reject)
+      .finally(() => {
+        active--;
+        pump();
+      });
+    pump();
+  };
+
+  return function schedule<T>(task: () => Promise<T>, priority = false): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      const job: QueueJob = { run: task, resolve, reject };
+      if (priority) queue.unshift(job);
+      else queue.push(job);
+      pump();
+    });
+  };
+}
+
+const overpassLimit = createLimiter(2, 350);
+const nominatimLimit = createLimiter(1, 1100);
+
+/** GET na Nominatim kroz red. null = nije uspjelo (mreža, 429, loš odgovor). */
+async function nominatimGet(url: string, priority = false): Promise<any[] | null> {
+  try {
+    const res = await nominatimLimit(async () => {
+      const ctrl = new AbortController();
+      const tid = setTimeout(() => ctrl.abort(), 10000);
+      try {
+        return await fetch(url, {
+          headers: { "User-Agent": "CroMapApp/1.0" },
+          signal: ctrl.signal,
+        });
+      } finally {
+        clearTimeout(tid);
+      }
+    }, priority);
+    if (!res.ok) return null;
+    const data = await res.json();
+    return Array.isArray(data) ? data : null;
+  } catch {
+    return null;
+  }
+}
+
+// Poslužitelji koji su nedavno odgovorili 429/503/504 — nekoliko minuta ih se
+// preskače umjesto da ih se dalje opterećuje.
+const OVERPASS_ENDPOINTS = [
+  "https://overpass-api.de/api/interpreter",
+  "https://overpass.kumi.systems/api/interpreter",
+  "https://overpass.openstreetmap.fr/api/interpreter",
+];
+const endpointBlockedUntil = new Map<string, number>();
 
 // ─── Geocode city ─────────────────────────────────────────────────────────────
 export interface GeocodedCity {
@@ -1044,23 +1136,27 @@ export interface GeocodedCity {
   displayName: string;
 }
 
+// Isti grad se ne geokodira ispočetka pri svakom planu: pamte se samo uspjesi.
+const geocodeCache = new Map<string, GeocodedCity>();
+
 export const geocodeCity = async (
   query: string,
 ): Promise<GeocodedCity | null> => {
+  const key = query.trim().toLowerCase();
+  const hit = geocodeCache.get(key);
+  if (hit) return hit;
   try {
     const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1&addressdetails=1`;
-    const res = await fetch(url, {
-      headers: { "User-Agent": "CroMapApp/1.0" },
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (!data.length) return null;
-    return {
+    const data = await nominatimGet(url, true);
+    if (!data || !data.length) return null;
+    const city: GeocodedCity = {
       latitude: parseFloat(data[0].lat),
       longitude: parseFloat(data[0].lon),
       displayName:
         data[0].display_name?.split(",").slice(0, 2).join(", ") || query,
     };
+    geocodeCache.set(key, city);
+    return city;
   } catch {
     return null;
   }
@@ -1077,16 +1173,8 @@ export const searchPlaces = async (
     let url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=10&addressdetails=1`;
     if (lat && lon) url += `&lat=${lat}&lon=${lon}`;
 
-    const ctrl = new AbortController();
-    const tid = setTimeout(() => ctrl.abort(), 10000);
-    const res = await fetch(url, {
-      headers: { "User-Agent": "CroMapApp/1.0" },
-      signal: ctrl.signal,
-    });
-    clearTimeout(tid);
-    if (!res.ok) return [];
-    const data = await res.json();
-    if (!Array.isArray(data)) return [];
+    const data = await nominatimGet(url, true);
+    if (!data) return [];
 
     return data.map((item: any) => ({
       id: item.place_id?.toString() || Date.now().toString(),
@@ -1440,7 +1528,7 @@ async function fetchFromOverpass(
   longitude: number,
   radiusM: number,
   type: string,
-): Promise<Place[]> {
+): Promise<Place[] | null> {
   const rule = CATEGORY_RULES[type];
   if (!rule) return [];
 
@@ -1458,26 +1546,46 @@ ${parts}
 );
 out body center;`;
 
-  const endpoints = [
-    "https://overpass-api.de/api/interpreter",
-    "https://overpass.openstreetmap.fr/api/interpreter",
-  ];
+  // Poslužitelji koji su nedavno odbili zahtjev preskaču se; ako su blokirani
+  // SVI, ipak se pokušava (bolje pokušaj nego sigurno prazan odgovor).
+  const nowMs = Date.now();
+  const usable = OVERPASS_ENDPOINTS.filter(
+    (e) => (endpointBlockedUntil.get(e) ?? 0) <= nowMs,
+  );
+  const endpoints = usable.length > 0 ? usable : OVERPASS_ENDPOINTS;
 
   for (const endpoint of endpoints) {
     try {
-      const ctrl = new AbortController();
-      const tid = setTimeout(() => ctrl.abort(), 35000);
-      const res = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: `data=${encodeURIComponent(overpassQuery)}`,
-        signal: ctrl.signal,
+      const res = await overpassLimit(async () => {
+        const ctrl = new AbortController();
+        const tid = setTimeout(() => ctrl.abort(), 30000);
+        try {
+          return await fetch(endpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: `data=${encodeURIComponent(overpassQuery)}`,
+            signal: ctrl.signal,
+          });
+        } finally {
+          clearTimeout(tid);
+        }
       });
-      clearTimeout(tid);
+
+      if (res.status === 429 || res.status === 503 || res.status === 504) {
+        const retryAfter = Number(res.headers.get("Retry-After"));
+        const waitMs =
+          Number.isFinite(retryAfter) && retryAfter > 0
+            ? Math.min(retryAfter * 1000, 5 * 60 * 1000)
+            : 60 * 1000;
+        endpointBlockedUntil.set(endpoint, Date.now() + waitMs);
+        continue;
+      }
       if (!res.ok) continue;
 
       const data = await res.json();
-      if (!data.elements?.length) continue;
+      // Odgovor je stigao, ali nema rezultata: to je uspjeh ("ovdje nema
+      // ništa"), a ne razlog da se pita još jedan poslužitelj.
+      if (!data.elements?.length) return [];
 
       const results: Place[] = [];
 
@@ -1579,25 +1687,60 @@ out body center;`;
     }
   }
 
-  return [];
+  // Nijedan poslužitelj nije odgovorio: to je NEUSPJEH, a ne "nema mjesta".
+  // Pozivatelj ga ne smije spremiti u predmemoriju kao prazan rezultat.
+  return null;
 }
 
 // ─── Glavna izvozna funkcija ──────────────────────────────────────────────────
-export const getPlacesInRadius = async (
+const placesKey = (
+  latitude: number,
+  longitude: number,
+  radiusM: number,
+  types: string[],
+) =>
+  `${latitude.toFixed(3)},${longitude.toFixed(3)},${radiusM},${[...types].sort().join(",")}`;
+
+// Istovjetni upiti koji stignu dok prvi još traje dijele jedan odgovor umjesto
+// da svaki pokrene vlastitih 17 upita (npr. karta i plan za isti grad).
+const inflightPlaces = new Map<string, Promise<Place[]>>();
+
+export const getPlacesInRadius = (
   latitude: number,
   longitude: number,
   radiusKm: number,
   types?: Place["type"][],
 ): Promise<Place[]> => {
-  if (!types || types.length === 0) return [];
+  if (!types || types.length === 0) return Promise.resolve([]);
 
+  const key = placesKey(latitude, longitude, Math.round(radiusKm * 1000), types);
+  const running = inflightPlaces.get(key);
+  if (running) return running;
+
+  const job = loadPlacesUncached(latitude, longitude, radiusKm, types).finally(
+    () => inflightPlaces.delete(key),
+  );
+  inflightPlaces.set(key, job);
+  return job;
+};
+
+const loadPlacesUncached = async (
+  latitude: number,
+  longitude: number,
+  radiusKm: number,
+  types: Place["type"][],
+): Promise<Place[]> => {
   const radiusM = Math.round(radiusKm * 1000);
-  const cacheKey = `${latitude.toFixed(3)},${longitude.toFixed(3)},${radiusM},${[...types].sort().join(",")}`;
+  const cacheKey = placesKey(latitude, longitude, radiusM, types);
 
   const cached = placesCache.get(cacheKey);
   if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
     return cached.places;
   }
+  // Stari zapis se ne briše: ako sada ništa ne uspije, bolje je prikazati
+  // prošli rezultat nego praznu kartu.
+  const stale = cached;
+  let failures = 0;
 
   // Blok smještajnih ključnih riječi za theater (koristi se na dva mjesta)
   const THEATER_BLOCK = [
@@ -1634,12 +1777,14 @@ export const getPlacesInRadius = async (
   ];
 
   const promises = types.map(async (type): Promise<Place[]> => {
-    const overpassResults = await fetchFromOverpass(
+    const overpassRaw = await fetchFromOverpass(
       latitude,
       longitude,
       radiusM,
       type,
     );
+    if (overpassRaw === null) failures++;
+    const overpassResults = overpassRaw ?? [];
 
     if (type === "theater") {
       // OSM amenity=theatre je dovoljan — ne trebamo name whitelist.
@@ -1651,7 +1796,7 @@ export const getPlacesInRadius = async (
 
       // Nominatim fallback samo ako OSM nema dovoljno, ali s name filterom
       // jer Nominatim vraća gradove/regije za query "theatre"
-      if (filtered.length < 2) {
+      if (filtered.length < 2 && overpassRaw !== null) {
         const nominatimResults = await fetchFromNominatim(
           latitude,
           longitude,
@@ -1684,7 +1829,7 @@ export const getPlacesInRadius = async (
     }
 
     // Sve ostale kategorije — standardni Nominatim fallback
-    if (overpassResults.length < 3) {
+    if (overpassRaw !== null && overpassResults.length < 3) {
       const nominatimResults = await fetchFromNominatim(
         latitude,
         longitude,
@@ -1718,7 +1863,14 @@ export const getPlacesInRadius = async (
   const deduped = deduplicatePlaces(allPlaces);
   deduped.sort((a: Place, b: Place) => (a.distance ?? 0) - (b.distance ?? 0));
 
-  placesCache.set(cacheKey, { places: deduped, timestamp: Date.now() });
+  // Spremaju se samo potpuni rezultati. Prije se u predmemoriju spremalo i
+  // ono što je ostalo kad su upiti zakazali — prazan popis na 5 minuta — pa je
+  // jedan neuspjeli upit ostavljao kartu praznom dok ne istekne.
+  if (failures === 0) {
+    placesCache.set(cacheKey, { places: deduped, timestamp: Date.now() });
+    return deduped;
+  }
+  if (deduped.length === 0 && stale) return stale.places;
   return deduped;
 };
 
@@ -1761,17 +1913,8 @@ async function fetchFromNominatim(
 
     const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&viewbox=${bbox}&bounded=1&limit=15&addressdetails=1`;
 
-    const ctrl = new AbortController();
-    const tid = setTimeout(() => ctrl.abort(), 10000);
-    const res = await fetch(url, {
-      headers: { "User-Agent": "CroMapApp/1.0" },
-      signal: ctrl.signal,
-    });
-    clearTimeout(tid);
-
-    if (!res.ok) return [];
-    const data = await res.json();
-    if (!Array.isArray(data)) return [];
+    const data = await nominatimGet(url);
+    if (!data) return [];
 
     const rule = CATEGORY_RULES[type];
     const results: Place[] = [];

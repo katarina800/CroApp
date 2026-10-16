@@ -999,7 +999,8 @@
     "actClub": "Noćni izlazak",
     "anonymous": "Anonimni korisnik",
     "travelFromPrevious": "{{min}} min od prethodne postaje",
-    "firstStop": "Prva postaja"
+    "firstStop": "Prva postaja",
+    "noVenues": "Za taj grad trenutno nismo uspjeli dohvatiti mjesta. Servis koji ih daje je privremeno preopterećen ili je radijus premalen. Pričekajte minutu pa pokušajte ponovno, ili povećajte radijus."
   },
   "story": {
     "myStory": "Moj story",

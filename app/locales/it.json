@@ -1002,7 +1002,8 @@
     "actClub": "Serata fuori",
     "anonymous": "Utente anonimo",
     "travelFromPrevious": "{{min}} min dalla tappa precedente",
-    "firstStop": "Prima tappa"
+    "firstStop": "Prima tappa",
+    "noVenues": "Al momento non siamo riusciti a caricare i luoghi per questa città. Il servizio è temporaneamente sovraccarico o il raggio è troppo piccolo. Attendi un minuto e riprova, oppure aumenta il raggio."
   },
   "story": {
     "myStory": "La mia storia",
