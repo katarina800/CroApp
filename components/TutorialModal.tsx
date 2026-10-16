@@ -79,7 +79,7 @@ const STORAGE_KEY = "vara_tutorial_seen_v1";
  */
 type Step = {
   /** Glavna slika iz aplikacije. */
-  image?: number;
+  image?: ImageSourcePropType;
   /** Manje ikone ispod glavne; isti izvor kao u aplikaciji. */
   extras?: ImageSourcePropType[];
   /** Gumb "+" kakav stoji u Videima. */
@@ -91,13 +91,13 @@ type Step = {
   bodyKey: string;
 };
 
-const MAP_ICON = require("../assets/images/karta.png");
-const VIDEO_ICON = require("../assets/images/video.png");
-const NOTIF_ICON = require("../assets/images/obav.png");
-const PLAN_ICON = require("../assets/images/put.png");
-const VISITED_ICON = require("../assets/images/posmjesta.png");
-const BADGES_ICON = require("../assets/images/uspjeh.png");
-const RADIUS_ICON = require("../assets/images/radijus.png");
+const MAP_ICON = APP_ICONS.navMap as ImageSourcePropType;
+const VIDEO_ICON = APP_ICONS.navVideo as ImageSourcePropType;
+const NOTIF_ICON = APP_ICONS.notifications as ImageSourcePropType;
+const PLAN_ICON = APP_ICONS.planDay as ImageSourcePropType;
+const VISITED_ICON = APP_ICONS.visited as ImageSourcePropType;
+const BADGES_ICON = APP_ICONS.badges as ImageSourcePropType;
+const RADIUS_ICON = APP_ICONS.radius as ImageSourcePropType;
 const MORNING_ICON = APP_ICONS.jutro as ImageSourcePropType;
 const AFTERNOON_ICON = APP_ICONS.poslijepodne as ImageSourcePropType;
 const EVENING_ICON = APP_ICONS.vecer as ImageSourcePropType;

@@ -10,12 +10,14 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { APP_ICONS } from "../constants/icons";
 
-const mapIcon = require("../assets/images/karta.png");
-const videoIcon = require("../assets/images/video.png");
-const messagesIcon = require("../assets/images/poruka.png");
-const searchIcon = require("../assets/images/pretraga.png");
-const profileIcon = require("../assets/images/profil.png");
+// Ikone iz središnjeg registra (nove; stare viking pločice su u LEGACY_ICONS).
+const mapIcon = APP_ICONS.navMap;
+const videoIcon = APP_ICONS.navVideo;
+const messagesIcon = APP_ICONS.navMessages;
+const searchIcon = APP_ICONS.navSearch;
+const profileIcon = APP_ICONS.navProfile;
 
 interface IconProps {
   active: boolean;

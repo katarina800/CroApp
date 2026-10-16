@@ -53,7 +53,29 @@ export type IconKey =
   | "javni"
   | "pjesice"
   | "bicikl"
-  | "kombinirano";
+  | "kombinirano"
+  // navigacija
+  | "navMap"
+  | "navVideo"
+  | "navMessages"
+  | "navSearch"
+  | "navProfile"
+  // alati i izbornik
+  | "planDay"
+  | "groups"
+  | "archive"
+  | "badges"
+  | "notifications"
+  | "radius"
+  | "visited"
+  // dobne skupine
+  | "ageMinors"
+  | "ageYouth"
+  | "ageStudents"
+  | "ageAdults"
+  | "ageRetired"
+  // oznaka korisnika na karti
+  | "traveller";
 
 export const NEW_ICONS: Record<IconKey, ImageSourcePropType> = {
   jutro: require("../assets/images/icons/time-morning.png"),
@@ -91,6 +113,26 @@ export const NEW_ICONS: Record<IconKey, ImageSourcePropType> = {
   pjesice: require("../assets/images/icons/transport-walk.png"),
   bicikl: require("../assets/images/icons/transport-bike.png"),
   kombinirano: require("../assets/images/icons/transport-combined.png"),
+
+  // navigacija, alati, dobne skupine, korisnik na karti
+  navMap: require("../assets/images/icons/nav-map.png"),
+  navVideo: require("../assets/images/icons/nav-video.png"),
+  navMessages: require("../assets/images/icons/nav-messages.png"),
+  navSearch: require("../assets/images/icons/nav-search.png"),
+  navProfile: require("../assets/images/icons/nav-profile.png"),
+  planDay: require("../assets/images/icons/tool-plan.png"),
+  groups: require("../assets/images/icons/tool-groups.png"),
+  archive: require("../assets/images/icons/tool-archive.png"),
+  badges: require("../assets/images/icons/tool-badges.png"),
+  notifications: require("../assets/images/icons/tool-notifications.png"),
+  radius: require("../assets/images/icons/tool-radius.png"),
+  visited: require("../assets/images/icons/tool-visited.png"),
+  ageMinors: require("../assets/images/icons/age-minors.png"),
+  ageYouth: require("../assets/images/icons/age-youth.png"),
+  ageStudents: require("../assets/images/icons/age-students.png"),
+  ageAdults: require("../assets/images/icons/age-adults.png"),
+  ageRetired: require("../assets/images/icons/age-retired.png"),
+  traveller: require("../assets/images/icons/map-traveller.png"),
 };
 
 /**
@@ -132,6 +174,25 @@ export const LEGACY_ICONS: Partial<Record<IconKey, ImageSourcePropType>> = {
   pjesice: require("../assets/images/pjesice.png"),
   bicikl: require("../assets/images/bicikl.png"),
   kombinirano: require("../assets/images/kombinirano.png"),
+
+  navMap: require("../assets/images/karta.png"),
+  navVideo: require("../assets/images/video.png"),
+  navMessages: require("../assets/images/poruka.png"),
+  navSearch: require("../assets/images/pretraga.png"),
+  navProfile: require("../assets/images/profil.png"),
+  planDay: require("../assets/images/put.png"),
+  groups: require("../assets/images/grupe.png"),
+  archive: require("../assets/images/arhiva.png"),
+  badges: require("../assets/images/uspjeh.png"),
+  notifications: require("../assets/images/obav.png"),
+  radius: require("../assets/images/radijus.png"),
+  visited: require("../assets/images/posmjesta.png"),
+  ageMinors: require("../assets/images/maloletnik.png"),
+  ageYouth: require("../assets/images/mladi.png"),
+  ageStudents: require("../assets/images/student.png"),
+  ageAdults: require("../assets/images/odrasli.png"),
+  ageRetired: require("../assets/images/umirovljenik.png"),
+  traveller: require("../assets/images/putnik.png"),
 };
 
 /**

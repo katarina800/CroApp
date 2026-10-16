@@ -196,7 +196,7 @@ const MARKER_IMAGES: Record<string, any> = {
   other: APP_ICONS.other,
 };
 
-const putnikIcon = require("../assets/images/putnik.png");
+const putnikIcon = APP_ICONS.traveller;
 
 // ---------------------------------------------------------------------------
 // Haversine
