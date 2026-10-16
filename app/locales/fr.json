@@ -165,7 +165,8 @@
     "resendNow": "Envoyer un nouveau code",
     "resendIn": "Renvoyer dans {{s}} s",
     "resent": "Un nouveau code a été envoyé. L'ancien code n'est plus valable.",
-    "changeEmail": "Utiliser une autre e-mail"
+    "changeEmail": "Utiliser une autre e-mail",
+    "emailUnavailable": "Nous ne pouvons pas envoyer l’e-mail avec le code pour le moment. Réessaie dans quelques minutes ou contacte-nous."
   },
   "password": {
     "minLength": "Min. 6 caractères",

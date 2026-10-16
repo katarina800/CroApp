@@ -165,7 +165,8 @@
     "resendNow": "Pošalji novi kod",
     "resendIn": "Ponovno slanje za {{s}} s",
     "resent": "Poslan je novi kod. Prethodni kod više ne vrijedi.",
-    "changeEmail": "Upiši drugu e-mail adresu"
+    "changeEmail": "Upiši drugu e-mail adresu",
+    "emailUnavailable": "Trenutno ne možemo poslati e-mail s kodom. Pokušaj ponovno za nekoliko minuta ili nas kontaktiraj."
   },
   "validation": {
     "enterFirstName": "Molimo unesite svoje ime.",

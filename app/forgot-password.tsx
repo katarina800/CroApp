@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   ActivityIndicator,
@@ -15,6 +15,7 @@ import {
   View,
 } from "react-native";
 import { API_ENDPOINTS } from "./config/api";
+import { useKeyboardOverlap } from "../hooks/use-keyboard-offset";
 import { T } from "../styles/varaTheme";
 
 type Step = "email" | "code" | "newPassword";
@@ -72,6 +73,9 @@ export default function ForgotPasswordScreen() {
         );
       } else if (response.status === 429) {
         Alert.alert(t("common.error"), t("common.tooManyRequests"));
+      } else if (response.status === 503) {
+        // Poslužitelj ne može poslati e-mail (kvar pružatelja pošte).
+        Alert.alert(t("common.error"), t("forgotPassword.emailUnavailable"));
       } else {
         Alert.alert(t("common.error"), t("forgotPassword.tryAgain"));
       }
@@ -220,6 +224,22 @@ export default function ForgotPasswordScreen() {
 
   const current = STEPS[step];
 
+  // Tipkovnica je prekrivala polje za e-mail: kartica je centrirana i dovoljno
+  // visoka da joj donji dio (polje + gumb) završi ispod tipkovnice. Mjeri se
+  // koliko tipkovnica STVARNO prekriva, taj se razmak doda na dno i sadržaj se
+  // pomakne do kraja — polje i gumb ostaju iznad tipkovnice.
+  const scrollRef = useRef<ScrollView>(null);
+  const areaRef = useRef<View>(null);
+  const keyboardOverlap = useKeyboardOverlap(areaRef);
+  useEffect(() => {
+    if (keyboardOverlap <= 0) return;
+    const id = setTimeout(
+      () => scrollRef.current?.scrollToEnd({ animated: true }),
+      120,
+    );
+    return () => clearTimeout(id);
+  }, [keyboardOverlap, step]);
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -233,234 +253,254 @@ export default function ForgotPasswordScreen() {
       // koristi useInputBottomOffset iz hooks/use-keyboard-offset.)
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <StatusBar barStyle="light-content" backgroundColor="#0D2406" />
-      <ScrollView contentContainerStyle={styles.scroll}>
-        <View style={styles.card}>
-          {/* Progress dots */}
-          <View style={styles.progress}>
-            {(["email", "code", "newPassword"] as Step[]).map((s, i) => (
-              <View
-                key={s}
-                style={[
-                  styles.dot,
-                  step === s && styles.dotActive,
-                  (step === "code" && i === 0) ||
-                  (step === "newPassword" && i <= 1)
-                    ? styles.dotDone
-                    : null,
-                ]}
-              />
-            ))}
-          </View>
-
-          <Text style={styles.icon}>{current.icon}</Text>
-          <Text style={styles.title}>{current.title}</Text>
-          <Text style={styles.subtitle}>{current.subtitle}</Text>
-
-          {/* EMAIL korak */}
-          {step === "email" && (
-            <View style={styles.form}>
-              <Text style={styles.label}>{t("forgotPassword.emailLabel")}</Text>
-              <TextInput
-                selectTextOnFocus
-                style={styles.input}
-                placeholder={t("forgotPassword.emailPlaceholder")}
-                placeholderTextColor="#9AA9A7"
-                value={contact}
-                onChangeText={setContact}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoFocus
-                editable={!isLoading}
-              />
-              <TouchableOpacity
-                style={[styles.button, isLoading && styles.buttonDisabled]}
-                onPress={handleRequestCode}
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.buttonText}>
-                    {t("forgotPassword.sendCode")}
-                  </Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {/* KOD korak */}
-          {step === "code" && (
-            <View style={styles.form}>
-              <Text style={styles.label}>{t("forgotPassword.codeLabel")}</Text>
-              <TextInput
-                selectTextOnFocus
-                style={[styles.input, styles.codeInput]}
-                placeholder="123456"
-                placeholderTextColor="#9AA9A7"
-                value={code}
-                onChangeText={(t) => setCode(t.replace(/\D/g, "").slice(0, 6))}
-                keyboardType="number-pad"
-                maxLength={6}
-                autoFocus
-              />
-              <TouchableOpacity
-                style={[styles.button, isLoading && styles.buttonDisabled]}
-                onPress={handleVerifyCode}
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.buttonText}>
-                    {t("forgotPassword.verifyCode")}
-                  </Text>
-                )}
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.resendBtn}
-                onPress={handleResendCode}
-                disabled={secondsLeft > 0 || isLoading}
-              >
-                <Text
+      <View
+        ref={areaRef}
+        collapsable={false}
+        style={{ flex: 1, paddingBottom: keyboardOverlap }}
+      >
+        <StatusBar barStyle="light-content" backgroundColor="#0D2406" />
+        <ScrollView
+          ref={scrollRef}
+          contentContainerStyle={styles.scroll}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.card}>
+            {/* Progress dots */}
+            <View style={styles.progress}>
+              {(["email", "code", "newPassword"] as Step[]).map((s, i) => (
+                <View
+                  key={s}
                   style={[
-                    styles.resendText,
-                    secondsLeft > 0 && styles.resendTextDisabled,
+                    styles.dot,
+                    step === s && styles.dotActive,
+                    (step === "code" && i === 0) ||
+                    (step === "newPassword" && i <= 1)
+                      ? styles.dotDone
+                      : null,
                   ]}
-                >
-                  {secondsLeft > 0
-                    ? t("forgotPassword.resendIn", { s: secondsLeft })
-                    : t("forgotPassword.resendNow")}
-                </Text>
-              </TouchableOpacity>
-              {/* Pogrešna adresa: natrag na unos e-maila i cijeli postupak ispočetka. */}
-              <TouchableOpacity
-                style={styles.resendBtn}
-                onPress={() => {
-                  setStep("email");
-                  setCode("");
-                  setResetToken("");
-                }}
-              >
-                <Text style={styles.resendText}>
-                  {t("forgotPassword.changeEmail")}
-                </Text>
-              </TouchableOpacity>
+                />
+              ))}
             </View>
-          )}
 
-          {/* NOVA LOZINKA korak */}
-          {step === "newPassword" && (
-            <View style={styles.form}>
-              <Text style={styles.label}>
-                {t("forgotPassword.newPasswordLabel")}
-              </Text>
-              <View style={{ position: "relative", justifyContent: "center" }}>
+            <Text style={styles.icon}>{current.icon}</Text>
+            <Text style={styles.title}>{current.title}</Text>
+            <Text style={styles.subtitle}>{current.subtitle}</Text>
+
+            {/* EMAIL korak */}
+            {step === "email" && (
+              <View style={styles.form}>
+                <Text style={styles.label}>
+                  {t("forgotPassword.emailLabel")}
+                </Text>
                 <TextInput
                   selectTextOnFocus
                   style={styles.input}
-                  placeholder={t("forgotPassword.newPasswordPlaceholder")}
+                  placeholder={t("forgotPassword.emailPlaceholder")}
                   placeholderTextColor="#9AA9A7"
-                  value={newPassword}
-                  onChangeText={setNewPassword}
-                  secureTextEntry={!showNewPassword}
+                  value={contact}
+                  onChangeText={setContact}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
                   autoFocus
                   editable={!isLoading}
                 />
                 <TouchableOpacity
-                  style={{
-                    position: "absolute",
-                    right: 14,
-                    height: "100%",
-                    justifyContent: "center",
-                    zIndex: 10,
-                    elevation: 10,
-                  }}
-                  onPress={() => setShowNewPassword((v) => !v)}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  style={[styles.button, isLoading && styles.buttonDisabled]}
+                  onPress={handleRequestCode}
+                  disabled={isLoading}
                 >
-                  <Text
-                    style={{
-                      fontSize: T.title,
-                      opacity: showNewPassword ? 1 : 0.5,
-                    }}
-                  >
-                    👁️
-                  </Text>
+                  {isLoading ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text style={styles.buttonText}>
+                      {t("forgotPassword.sendCode")}
+                    </Text>
+                  )}
                 </TouchableOpacity>
               </View>
-              <Text style={[styles.label, { marginTop: 12 }]}>
-                {t("forgotPassword.confirmPasswordLabel")}
-              </Text>
-              <View style={{ position: "relative", justifyContent: "center" }}>
+            )}
+
+            {/* KOD korak */}
+            {step === "code" && (
+              <View style={styles.form}>
+                <Text style={styles.label}>
+                  {t("forgotPassword.codeLabel")}
+                </Text>
                 <TextInput
                   selectTextOnFocus
-                  style={[
-                    styles.input,
-                    confirmPassword && newPassword !== confirmPassword
-                      ? styles.inputError
-                      : null,
-                  ]}
-                  placeholder={t("forgotPassword.confirmPasswordPlaceholder")}
+                  style={[styles.input, styles.codeInput]}
+                  placeholder="123456"
                   placeholderTextColor="#9AA9A7"
-                  value={confirmPassword}
-                  onChangeText={setConfirmPassword}
-                  secureTextEntry={!showConfirmPassword}
-                  editable={!isLoading}
+                  value={code}
+                  onChangeText={(t) =>
+                    setCode(t.replace(/\D/g, "").slice(0, 6))
+                  }
+                  keyboardType="number-pad"
+                  maxLength={6}
+                  autoFocus
                 />
                 <TouchableOpacity
-                  style={{
-                    position: "absolute",
-                    right: 14,
-                    height: "100%",
-                    justifyContent: "center",
-                    zIndex: 10,
-                    elevation: 10,
-                  }}
-                  onPress={() => setShowConfirmPassword((v) => !v)}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  style={[styles.button, isLoading && styles.buttonDisabled]}
+                  onPress={handleVerifyCode}
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text style={styles.buttonText}>
+                      {t("forgotPassword.verifyCode")}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.resendBtn}
+                  onPress={handleResendCode}
+                  disabled={secondsLeft > 0 || isLoading}
                 >
                   <Text
-                    style={{
-                      fontSize: T.title,
-                      opacity: showConfirmPassword ? 1 : 0.5,
-                    }}
+                    style={[
+                      styles.resendText,
+                      secondsLeft > 0 && styles.resendTextDisabled,
+                    ]}
                   >
-                    👁️
+                    {secondsLeft > 0
+                      ? t("forgotPassword.resendIn", { s: secondsLeft })
+                      : t("forgotPassword.resendNow")}
+                  </Text>
+                </TouchableOpacity>
+                {/* Pogrešna adresa: natrag na unos e-maila i cijeli postupak ispočetka. */}
+                <TouchableOpacity
+                  style={styles.resendBtn}
+                  onPress={() => {
+                    setStep("email");
+                    setCode("");
+                    setResetToken("");
+                  }}
+                >
+                  <Text style={styles.resendText}>
+                    {t("forgotPassword.changeEmail")}
                   </Text>
                 </TouchableOpacity>
               </View>
-              {confirmPassword && newPassword !== confirmPassword && (
-                <Text style={styles.errorText}>
-                  {t("auth.passwordMismatch")}
+            )}
+
+            {/* NOVA LOZINKA korak */}
+            {step === "newPassword" && (
+              <View style={styles.form}>
+                <Text style={styles.label}>
+                  {t("forgotPassword.newPasswordLabel")}
                 </Text>
-              )}
-              <TouchableOpacity
-                style={[styles.button, isLoading && styles.buttonDisabled]}
-                onPress={handleResetPassword}
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.buttonText}>
-                    {t("forgotPassword.changePasswordBtn")}
+                <View
+                  style={{ position: "relative", justifyContent: "center" }}
+                >
+                  <TextInput
+                    selectTextOnFocus
+                    style={styles.input}
+                    placeholder={t("forgotPassword.newPasswordPlaceholder")}
+                    placeholderTextColor="#9AA9A7"
+                    value={newPassword}
+                    onChangeText={setNewPassword}
+                    secureTextEntry={!showNewPassword}
+                    autoFocus
+                    editable={!isLoading}
+                  />
+                  <TouchableOpacity
+                    style={{
+                      position: "absolute",
+                      right: 14,
+                      height: "100%",
+                      justifyContent: "center",
+                      zIndex: 10,
+                      elevation: 10,
+                    }}
+                    onPress={() => setShowNewPassword((v) => !v)}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: T.title,
+                        opacity: showNewPassword ? 1 : 0.5,
+                      }}
+                    >
+                      👁️
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                <Text style={[styles.label, { marginTop: 12 }]}>
+                  {t("forgotPassword.confirmPasswordLabel")}
+                </Text>
+                <View
+                  style={{ position: "relative", justifyContent: "center" }}
+                >
+                  <TextInput
+                    selectTextOnFocus
+                    style={[
+                      styles.input,
+                      confirmPassword && newPassword !== confirmPassword
+                        ? styles.inputError
+                        : null,
+                    ]}
+                    placeholder={t("forgotPassword.confirmPasswordPlaceholder")}
+                    placeholderTextColor="#9AA9A7"
+                    value={confirmPassword}
+                    onChangeText={setConfirmPassword}
+                    secureTextEntry={!showConfirmPassword}
+                    editable={!isLoading}
+                  />
+                  <TouchableOpacity
+                    style={{
+                      position: "absolute",
+                      right: 14,
+                      height: "100%",
+                      justifyContent: "center",
+                      zIndex: 10,
+                      elevation: 10,
+                    }}
+                    onPress={() => setShowConfirmPassword((v) => !v)}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: T.title,
+                        opacity: showConfirmPassword ? 1 : 0.5,
+                      }}
+                    >
+                      👁️
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                {confirmPassword && newPassword !== confirmPassword && (
+                  <Text style={styles.errorText}>
+                    {t("auth.passwordMismatch")}
                   </Text>
                 )}
-              </TouchableOpacity>
-            </View>
-          )}
+                <TouchableOpacity
+                  style={[styles.button, isLoading && styles.buttonDisabled]}
+                  onPress={handleResetPassword}
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text style={styles.buttonText}>
+                      {t("forgotPassword.changePasswordBtn")}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            )}
 
-          <TouchableOpacity
-            style={styles.backBtn}
-            onPress={() => router.back()}
-          >
-            <Text style={styles.backText}>
-              {t("forgotPassword.backToLogin")}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
+            <TouchableOpacity
+              style={styles.backBtn}
+              onPress={() => router.back()}
+            >
+              <Text style={styles.backText}>
+                {t("forgotPassword.backToLogin")}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </View>
     </KeyboardAvoidingView>
   );
 }
