@@ -30,6 +30,7 @@ import UserAvatar from "../../components/UserAvatar";
 import { API_BASE_URL } from "../config/api";
 import { useUser } from "./../contexts/UserContext";
 import { CloseButton } from "@/components/CloseButton";
+import { UnsavedBar } from "@/components/UnsavedBar";
 import { TutorialModal } from "../../components/TutorialModal";
 import { getVara } from "../../styles/adaptiveVara";
 import { ErrorBanner } from "../../components/StateView";
@@ -3647,6 +3648,12 @@ function SettingsModal({
     await saveLanguage(langCode);
   };
 
+  // Promijenjeno u odnosu na ono što je spremljeno na računu.
+  const settingsDirty =
+    isPublic !== (profile?.isPublic ?? true) ||
+    showUsernameOnProfile !== (profile?.showUsername ?? true) ||
+    screenLimit !== (profile?.screenTimeLimitMinutes ?? 0);
+
   const saveSettings = async () => {
     setSaving(true);
     try {
@@ -3832,12 +3839,19 @@ function SettingsModal({
             {saving ? (
               <ActivityIndicator size="small" color={V.visited} />
             ) : (
-              <Text style={sm.saveBtn}>{t("common.save")}</Text>
+              <Text
+                style={[
+                  sm.saveBtn,
+                  settingsDirty && { color: "#C9A227", fontWeight: "800" },
+                ]}
+              >
+                {settingsDirty ? `● ${t("common.save")}` : t("common.save")}
+              </Text>
             )}
           </TouchableOpacity>
         </View>
 
-        <ScrollView contentContainerStyle={{ paddingBottom: 80 }}>
+        <ScrollView contentContainerStyle={{ paddingBottom: 110 }}>
           {/* ─── JEZIK ─────────────────────────────────────── */}
           <View style={[sm.section, { marginTop: 8 }]}>
             <Text style={sm.sectionTitle}>{t("profile.language")}</Text>
@@ -4308,6 +4322,11 @@ function SettingsModal({
             </TouchableOpacity>
           </View>
         </ScrollView>
+        <UnsavedBar
+          visible={settingsDirty}
+          loading={saving}
+          onPress={saveSettings}
+        />
       </SafeAreaView>
       <TutorialModal
         visible={tutorialOpen}

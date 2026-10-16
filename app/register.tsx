@@ -311,6 +311,7 @@ export default function RegisterScreen() {
               <Text style={s.label}>{t("auth.firstName").toUpperCase()} *</Text>
               <View style={{ justifyContent: "center" }}>
                 <TextInput
+                  selectTextOnFocus
                   style={[
                     s.input,
                     form.firstName.trim().length > 0 && s.inputValid,
@@ -331,6 +332,7 @@ export default function RegisterScreen() {
               <Text style={s.label}>{t("auth.lastName").toUpperCase()} *</Text>
               <View style={{ justifyContent: "center" }}>
                 <TextInput
+                  selectTextOnFocus
                   style={[
                     s.input,
                     form.lastName.trim().length > 0 && s.inputValid,
@@ -377,6 +379,7 @@ export default function RegisterScreen() {
             <Text style={s.label}>{t("auth.password").toUpperCase()} *</Text>
             <View style={{ position: "relative", justifyContent: "center" }}>
               <TextInput
+                selectTextOnFocus
                 style={[s.input, form.password.length >= 6 && s.inputValid]}
                 placeholder="Najmanje 6 znakova"
                 placeholderTextColor="#9AA9A7"
@@ -482,6 +485,7 @@ export default function RegisterScreen() {
             <View style={{ flexDirection: "row", gap: 8 }}>
               <View style={{ flex: 1, justifyContent: "center" }}>
                 <TextInput
+                  selectTextOnFocus
                   style={[s.input, isBirthDateValid && s.inputValid]}
                   placeholder={t("auth.birthDatePlaceholder")}
                   placeholderTextColor="#9AA9A7"
@@ -621,6 +625,7 @@ function Field(props: {
       </Text>
       <View style={{ justifyContent: "center" }}>
         <TextInput
+          selectTextOnFocus
           style={[
             s.input,
             focused && s.inputFocused,

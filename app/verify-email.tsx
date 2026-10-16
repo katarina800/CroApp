@@ -131,6 +131,7 @@ export default function VerifyEmailScreen() {
           <View style={styles.form}>
             <Text style={styles.label}>{t("verifyEmail.codeLabel")}</Text>
             <TextInput
+              selectTextOnFocus
               style={[styles.input, styles.codeInput]}
               placeholder="123456"
               placeholderTextColor="#9AA9A7"

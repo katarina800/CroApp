@@ -55,7 +55,8 @@
     "settings": "Impostazioni",
     "accept": "Accetta",
     "decline": "Rifiuta",
-    "comments": "Commenti"
+    "comments": "Commenti",
+    "unsavedChanges": "Hai modifiche non salvate"
   },
   "auth": {
     "login": "Accesso",
@@ -377,7 +378,8 @@
     "filtersHint": "Scegli raggio, momento della giornata e categorie. La mappa si aggiorna quando chiudi il pannello.",
     "searchCategories": "Cerca categoria…",
     "noCategoryMatch": "Nessuna categoria con questo nome.",
-    "radiusUnit": "Raggio di ricerca: {{km}} km"
+    "radiusUnit": "Raggio di ricerca: {{km}} km",
+    "hideCircle": "Nascondi cerchio"
   },
   "videos": {
     "title": "Video",

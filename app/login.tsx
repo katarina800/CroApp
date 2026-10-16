@@ -84,6 +84,7 @@ function FormField(props: {
       <Text style={s.label}>{props.label.toUpperCase()}</Text>
       <View style={{ position: "relative", justifyContent: "center" }}>
         <TextInput
+          selectTextOnFocus
           style={[
             s.input,
             focused && s.inputFocused,

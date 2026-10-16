@@ -55,7 +55,8 @@
     "settings": "Settings",
     "accept": "Accept",
     "decline": "Decline",
-    "comments": "Comments"
+    "comments": "Comments",
+    "unsavedChanges": "You have unsaved changes"
   },
   "auth": {
     "login": "Login",
@@ -381,7 +382,8 @@
     "filtersHint": "Choose a radius, time of day and categories. The map refreshes when you close this panel.",
     "searchCategories": "Search categories…",
     "noCategoryMatch": "No category with that name.",
-    "radiusUnit": "Search radius: {{km}} km"
+    "radiusUnit": "Search radius: {{km}} km",
+    "hideCircle": "Hide circle"
   },
   "videos": {
     "title": "Videos",

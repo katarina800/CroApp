@@ -25,7 +25,6 @@ import {
   Image,
   Modal,
   Pressable,
-  ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
@@ -109,6 +108,212 @@ function distanceKm(
   const dLat = (bLat - aLat) * 111;
   const dLon = (bLon - aLon) * 111 * Math.cos((aLat * Math.PI) / 180);
   return Math.sqrt(dLat * dLat + dLon * dLon);
+}
+
+/** Jedna objava u rezultatima: slika s oznakama, naslov, mjesto, kategorije. */
+function AreaPostCard({
+  item,
+  km,
+  placeName,
+  onPress,
+}: {
+  item: AreaPost;
+  km: number | null;
+  placeName: string;
+  onPress: () => void;
+}) {
+  const { t } = useTranslation();
+  const [imgFailed, setImgFailed] = useState(false);
+  const thumb = fullUrl(item.thumbnailPath || item.filePath);
+  const isVideo = !(item.mediaType === "image" || isImagePath(item.filePath));
+  const cats = (item.categories || "")
+    .split(",")
+    .map((c) => c.trim())
+    .filter(Boolean)
+    .slice(0, 3);
+  // Bez slike (video bez sličice, pogreška učitavanja) nikad crna ploha:
+  // zelena podloga s ikonom kategorije.
+  const placeholderIcon = (cats[0] && getIcon(cats[0])) || APP_ICONS.navVideo;
+  const showImage = !!thumb && !imgFailed;
+
+  return (
+    <TouchableOpacity
+      activeOpacity={0.85}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={t("common.openPost")}
+      style={{
+        marginHorizontal: 16,
+        marginTop: 12,
+        borderRadius: 18,
+        overflow: "hidden",
+        backgroundColor: "#1b3a20",
+        borderWidth: 1,
+        borderColor: "#2f5a33",
+      }}
+    >
+      <View style={{ height: 150, backgroundColor: "#24472a" }}>
+        {showImage ? (
+          <Image
+            source={{ uri: thumb }}
+            style={{ width: "100%", height: "100%" }}
+            resizeMode="cover"
+            onError={() => setImgFailed(true)}
+          />
+        ) : (
+          <View
+            style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
+          >
+            <Image
+              source={placeholderIcon}
+              style={{ width: 72, height: 72, opacity: 0.9 }}
+              resizeMode="contain"
+            />
+          </View>
+        )}
+
+        {/* Tamna traka pri dnu slike da oznake ostanu čitljive */}
+        <View
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            bottom: 0,
+            height: 44,
+            backgroundColor: "rgba(10,24,12,0.35)",
+          }}
+        />
+
+        {item.isEvent && item.eventStartAt && (
+          <View
+            style={{
+              position: "absolute",
+              top: 10,
+              left: 10,
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 5,
+              paddingHorizontal: 10,
+              paddingVertical: 5,
+              borderRadius: 12,
+              backgroundColor: "#C9A227",
+            }}
+          >
+            <Ionicons name="calendar-outline" size={13} color="#1A2E15" />
+            <Text style={{ color: "#1A2E15", fontSize: 12, fontWeight: "800" }}>
+              {eventWhen(item.eventStartAt)}
+            </Text>
+          </View>
+        )}
+
+        {isVideo && showImage && (
+          <View
+            style={{
+              position: "absolute",
+              top: 10,
+              right: 10,
+              width: 30,
+              height: 30,
+              borderRadius: 15,
+              backgroundColor: "rgba(10,24,12,0.7)",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Ionicons name="play" size={15} color="#fff" />
+          </View>
+        )}
+
+        {km !== null && (
+          <View
+            style={{
+              position: "absolute",
+              bottom: 10,
+              right: 10,
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 4,
+              paddingHorizontal: 9,
+              paddingVertical: 4,
+              borderRadius: 12,
+              backgroundColor: "rgba(10,24,12,0.78)",
+            }}
+          >
+            <Ionicons name="navigate-outline" size={12} color="#cfe6c4" />
+            <Text style={{ color: "#fff", fontSize: 12, fontWeight: "700" }}>
+              {km < 1 ? `${Math.round(km * 1000)} m` : `${km.toFixed(1)} km`}
+              {/* Gola brojka ne kaže od čega se mjeri; uz ime mjesta je jasno. */}
+              {placeName ? ` ${t("area.from", { place: placeName })}` : ""}
+            </Text>
+          </View>
+        )}
+      </View>
+
+      <View style={{ padding: 12, gap: 6 }}>
+        <Text
+          style={{ color: "#fff", fontSize: T.lead, fontWeight: "800" }}
+          numberOfLines={2}
+        >
+          {item.title}
+        </Text>
+        {!!item.location && (
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+            <Ionicons name="location-outline" size={14} color="#8aa483" />
+            <Text
+              style={{ flex: 1, color: "#b6cfae", fontSize: T.meta }}
+              numberOfLines={1}
+            >
+              {item.location}
+            </Text>
+          </View>
+        )}
+        {cats.length > 0 && (
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+            {cats.map((id) => {
+              const icon = getIcon(id);
+              return (
+                <View
+                  key={id}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 4,
+                    paddingLeft: 3,
+                    paddingRight: 9,
+                    paddingVertical: 2,
+                    borderRadius: 12,
+                    backgroundColor: "#24472a",
+                  }}
+                >
+                  {icon && (
+                    <Image
+                      source={icon}
+                      style={{ width: 20, height: 20 }}
+                      resizeMode="contain"
+                    />
+                  )}
+                  <Text
+                    style={{
+                      color: "#cfe0c6",
+                      fontSize: 12,
+                      fontWeight: "600",
+                    }}
+                  >
+                    {t(`categories.${id}`, { defaultValue: id })}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
+        )}
+        {!!item.userName && (
+          <Text style={{ color: "#8aa483", fontSize: 12 }}>
+            @{item.userName}
+          </Text>
+        )}
+      </View>
+    </TouchableOpacity>
+  );
 }
 
 export function AreaActivitiesSheet({
@@ -340,296 +545,311 @@ export function AreaActivitiesSheet({
               <CloseButton onPress={onClose} tone="light" />
             </View>
 
-            {showHint && (
-              <View
-                style={{
-                  marginHorizontal: 16,
-                  marginBottom: 6,
-                  padding: 12,
-                  borderRadius: 14,
-                  backgroundColor: "#1f4024",
-                  borderWidth: 1,
-                  borderColor: "#5a8a48",
-                }}
-              >
-                <View
-                  style={{
-                    flexDirection: "row",
-                    gap: 10,
-                    alignItems: "center",
-                  }}
-                >
-                  <Image
-                    source={APP_ICONS.mapActivities}
-                    style={{ width: 44, height: 44 }}
-                    resizeMode="contain"
-                  />
-                  <View style={{ flex: 1 }}>
-                    <Text
+            <FlatList
+              data={loading ? [] : shown}
+              keyExtractor={(p) => String(p.id)}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={{ paddingBottom: 32 }}
+              ListHeaderComponent={
+                <View>
+                  {showHint && (
+                    <View
                       style={{
-                        color: "#fff",
-                        fontSize: T.body,
-                        fontWeight: "800",
+                        marginHorizontal: 16,
+                        marginBottom: 6,
+                        padding: 12,
+                        borderRadius: 14,
+                        backgroundColor: "#1f4024",
+                        borderWidth: 1,
+                        borderColor: "#5a8a48",
                       }}
                     >
-                      {t("area.hintTitle")}
-                    </Text>
-                    <Text
-                      style={{
-                        color: "#cfe0c6",
-                        fontSize: T.meta,
-                        lineHeight: 18,
-                        marginTop: 2,
-                      }}
-                    >
-                      {t("area.hintBody")}
-                    </Text>
-                  </View>
-                </View>
-                <TouchableOpacity
-                  onPress={dismissHint}
-                  style={{
-                    alignSelf: "flex-end",
-                    marginTop: 8,
-                    paddingHorizontal: 16,
-                    paddingVertical: 8,
-                    borderRadius: 10,
-                    backgroundColor: "#5a8a48",
-                  }}
-                  accessibilityRole="button"
-                >
-                  <Text
-                    style={{
-                      color: "#fff",
-                      fontSize: T.meta,
-                      fontWeight: "700",
-                    }}
-                  >
-                    {t("area.hintOk")}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            )}
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          gap: 10,
+                          alignItems: "center",
+                        }}
+                      >
+                        <Image
+                          source={APP_ICONS.mapActivities}
+                          style={{ width: 44, height: 44 }}
+                          resizeMode="contain"
+                        />
+                        <View style={{ flex: 1 }}>
+                          <Text
+                            style={{
+                              color: "#fff",
+                              fontSize: T.body,
+                              fontWeight: "800",
+                            }}
+                          >
+                            {t("area.hintTitle")}
+                          </Text>
+                          <Text
+                            style={{
+                              color: "#cfe0c6",
+                              fontSize: T.meta,
+                              lineHeight: 18,
+                              marginTop: 2,
+                            }}
+                          >
+                            {t("area.hintBody")}
+                          </Text>
+                        </View>
+                      </View>
+                      <TouchableOpacity
+                        onPress={dismissHint}
+                        style={{
+                          alignSelf: "flex-end",
+                          marginTop: 8,
+                          paddingHorizontal: 16,
+                          paddingVertical: 8,
+                          borderRadius: 10,
+                          backgroundColor: "#5a8a48",
+                        }}
+                        accessibilityRole="button"
+                      >
+                        <Text
+                          style={{
+                            color: "#fff",
+                            fontSize: T.meta,
+                            fontWeight: "700",
+                          }}
+                        >
+                          {t("area.hintOk")}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
 
-            {/* Domet — pet jednako širokih polja u jednom retku. */}
-            <Text style={labelStyle}>{t("area.rangeLabel")}</Text>
-            <View
-              style={{ flexDirection: "row", gap: 6, paddingHorizontal: 16 }}
-            >
-              {RADIUS_OPTIONS.map((km) => {
-                const on = km === radiusKm;
-                return (
-                  <TouchableOpacity
-                    key={km}
-                    onPress={() => chooseRadius(km)}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: on }}
-                    style={{
-                      flex: 1,
-                      paddingVertical: 9,
-                      alignItems: "center",
-                      borderRadius: 12,
-                      borderWidth: 1.5,
-                      borderColor: on ? "#8fd06a" : "#2f5a33",
-                      backgroundColor: on ? "#5a8a48" : "#1b3a20",
-                    }}
-                  >
-                    <Text
-                      style={{
-                        color: on ? "#fff" : "#b6cfae",
-                        fontSize: T.meta,
-                        fontWeight: "800",
-                      }}
-                    >
-                      {km} km
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-
-            {/* Kategorije — zatvorene zauzimaju jedan redak, otvorene imaju
-                pretragu i mrežu s ikonama; više nema vodoravnog listanja. */}
-            <TouchableOpacity
-              onPress={() => setShowCats((v) => !v)}
-              accessibilityRole="button"
-              accessibilityState={{ expanded: showCats }}
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "space-between",
-                marginHorizontal: 16,
-                marginTop: 12,
-                paddingHorizontal: 12,
-                paddingVertical: 10,
-                borderRadius: 12,
-                backgroundColor: "#1b3a20",
-                borderWidth: 1.5,
-                borderColor: selectedCats.length ? "#c9a227" : "#2f5a33",
-              }}
-            >
-              <View style={{ flex: 1, paddingRight: 8 }}>
-                <Text
-                  style={{
-                    color: "#8aa483",
-                    fontSize: T.caption,
-                    fontWeight: "700",
-                    textTransform: "uppercase",
-                    letterSpacing: 0.5,
-                  }}
-                >
-                  {t("area.categoriesLabel")}
-                </Text>
-                <Text
-                  style={{
-                    color: "#fff",
-                    fontSize: T.body,
-                    fontWeight: "700",
-                    marginTop: 2,
-                  }}
-                  numberOfLines={1}
-                >
-                  {selectedCats.length === 0
-                    ? t("area.allCategories")
-                    : selectedCats
-                        .map((id) =>
-                          t(`categories.${id}`, { defaultValue: id }),
-                        )
-                        .join(", ")}
-                </Text>
-              </View>
-              <Ionicons
-                name={showCats ? "chevron-up" : "chevron-down"}
-                size={22}
-                color="#cfe6c4"
-              />
-            </TouchableOpacity>
-
-            {showCats && (
-              <View style={{ marginHorizontal: 16, marginTop: 8 }}>
-                <TextInput
-                  value={catQuery}
-                  onChangeText={setCatQuery}
-                  placeholder={t("area.searchCategories")}
-                  placeholderTextColor="#7d9a76"
-                  autoCorrect={false}
-                  autoCapitalize="none"
-                  clearButtonMode="while-editing"
-                  style={{
-                    backgroundColor: "#0f2412",
-                    borderRadius: 10,
-                    borderWidth: 1,
-                    borderColor: "#2f5a33",
-                    paddingHorizontal: 12,
-                    paddingVertical: 9,
-                    color: "#fff",
-                    fontSize: T.body,
-                    marginBottom: 8,
-                  }}
-                />
-                <ScrollView
-                  style={{ maxHeight: 200 }}
-                  keyboardShouldPersistTaps="handled"
-                  nestedScrollEnabled
-                >
+                  {/* Domet — pet jednako širokih polja u jednom retku. */}
+                  <Text style={labelStyle}>{t("area.rangeLabel")}</Text>
                   <View
-                    style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}
+                    style={{
+                      flexDirection: "row",
+                      gap: 6,
+                      paddingHorizontal: 16,
+                    }}
                   >
-                    {POST_CATEGORY_IDS.filter((id) => {
-                      const q = catQuery
-                        .normalize("NFD")
-                        .replace(/[\u0300-\u036f]/g, "")
-                        .toLowerCase()
-                        .trim();
-                      if (!q) return true;
-                      return t(`categories.${id}`, { defaultValue: id })
-                        .normalize("NFD")
-                        .replace(/[\u0300-\u036f]/g, "")
-                        .toLowerCase()
-                        .includes(q);
-                    }).map((id) => {
-                      const on = selectedCats.includes(id);
-                      const icon = getIcon(id);
+                    {RADIUS_OPTIONS.map((km) => {
+                      const on = km === radiusKm;
                       return (
                         <TouchableOpacity
-                          key={id}
-                          onPress={() => toggleCat(id)}
+                          key={km}
+                          onPress={() => chooseRadius(km)}
                           accessibilityRole="button"
                           accessibilityState={{ selected: on }}
                           style={{
-                            flexDirection: "row",
+                            flex: 1,
+                            paddingVertical: 9,
                             alignItems: "center",
-                            gap: 6,
-                            paddingLeft: 4,
-                            paddingRight: 10,
-                            paddingVertical: 4,
-                            borderRadius: 16,
+                            borderRadius: 12,
                             borderWidth: 1.5,
-                            borderColor: on ? "#c9a227" : "#2f5a33",
-                            backgroundColor: on ? "#c9a22733" : "#1b3a20",
+                            borderColor: on ? "#8fd06a" : "#2f5a33",
+                            backgroundColor: on ? "#5a8a48" : "#1b3a20",
                           }}
                         >
-                          {icon && (
-                            <Image
-                              source={icon}
-                              style={{ width: 28, height: 28 }}
-                              resizeMode="contain"
-                            />
-                          )}
                           <Text
                             style={{
-                              color: on ? "#f2d78a" : "#b6cfae",
+                              color: on ? "#fff" : "#b6cfae",
                               fontSize: T.meta,
-                              fontWeight: "600",
+                              fontWeight: "800",
                             }}
                           >
-                            {t(`categories.${id}`, { defaultValue: id })}
+                            {km} km
                           </Text>
                         </TouchableOpacity>
                       );
                     })}
                   </View>
-                </ScrollView>
-                {selectedCats.length > 0 && (
+
+                  {/* Kategorije — zatvorene zauzimaju jedan redak, otvorene imaju
+                pretragu i mrežu s ikonama; više nema vodoravnog listanja. */}
                   <TouchableOpacity
-                    onPress={() => setSelectedCats([])}
-                    style={{ alignSelf: "flex-start", paddingVertical: 8 }}
+                    onPress={() => setShowCats((v) => !v)}
+                    accessibilityRole="button"
+                    accessibilityState={{ expanded: showCats }}
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      marginHorizontal: 16,
+                      marginTop: 12,
+                      paddingHorizontal: 12,
+                      paddingVertical: 10,
+                      borderRadius: 12,
+                      backgroundColor: "#1b3a20",
+                      borderWidth: 1.5,
+                      borderColor: selectedCats.length ? "#c9a227" : "#2f5a33",
+                    }}
                   >
+                    <View style={{ flex: 1, paddingRight: 8 }}>
+                      <Text
+                        style={{
+                          color: "#8aa483",
+                          fontSize: T.caption,
+                          fontWeight: "700",
+                          textTransform: "uppercase",
+                          letterSpacing: 0.5,
+                        }}
+                      >
+                        {t("area.categoriesLabel")}
+                      </Text>
+                      <Text
+                        style={{
+                          color: "#fff",
+                          fontSize: T.body,
+                          fontWeight: "700",
+                          marginTop: 2,
+                        }}
+                        numberOfLines={1}
+                      >
+                        {selectedCats.length === 0
+                          ? t("area.allCategories")
+                          : selectedCats
+                              .map((id) =>
+                                t(`categories.${id}`, { defaultValue: id }),
+                              )
+                              .join(", ")}
+                      </Text>
+                    </View>
+                    <Ionicons
+                      name={showCats ? "chevron-up" : "chevron-down"}
+                      size={22}
+                      color="#cfe6c4"
+                    />
+                  </TouchableOpacity>
+
+                  {showCats && (
+                    <View style={{ marginHorizontal: 16, marginTop: 8 }}>
+                      <TextInput
+                        selectTextOnFocus
+                        value={catQuery}
+                        onChangeText={setCatQuery}
+                        placeholder={t("area.searchCategories")}
+                        placeholderTextColor="#7d9a76"
+                        autoCorrect={false}
+                        autoCapitalize="none"
+                        clearButtonMode="while-editing"
+                        style={{
+                          backgroundColor: "#0f2412",
+                          borderRadius: 10,
+                          borderWidth: 1,
+                          borderColor: "#2f5a33",
+                          paddingHorizontal: 12,
+                          paddingVertical: 9,
+                          color: "#fff",
+                          fontSize: T.body,
+                          marginBottom: 8,
+                        }}
+                      />
+                      <View>
+                        <View
+                          style={{
+                            flexDirection: "row",
+                            flexWrap: "wrap",
+                            gap: 6,
+                          }}
+                        >
+                          {POST_CATEGORY_IDS.filter((id) => {
+                            const q = catQuery
+                              .normalize("NFD")
+                              .replace(/[\u0300-\u036f]/g, "")
+                              .toLowerCase()
+                              .trim();
+                            if (!q) return true;
+                            return t(`categories.${id}`, { defaultValue: id })
+                              .normalize("NFD")
+                              .replace(/[\u0300-\u036f]/g, "")
+                              .toLowerCase()
+                              .includes(q);
+                          }).map((id) => {
+                            const on = selectedCats.includes(id);
+                            const icon = getIcon(id);
+                            return (
+                              <TouchableOpacity
+                                key={id}
+                                onPress={() => toggleCat(id)}
+                                accessibilityRole="button"
+                                accessibilityState={{ selected: on }}
+                                style={{
+                                  flexDirection: "row",
+                                  alignItems: "center",
+                                  gap: 6,
+                                  paddingLeft: 4,
+                                  paddingRight: 10,
+                                  paddingVertical: 4,
+                                  borderRadius: 16,
+                                  borderWidth: 1.5,
+                                  borderColor: on ? "#c9a227" : "#2f5a33",
+                                  backgroundColor: on ? "#c9a22733" : "#1b3a20",
+                                }}
+                              >
+                                {icon && (
+                                  <Image
+                                    source={icon}
+                                    style={{ width: 28, height: 28 }}
+                                    resizeMode="contain"
+                                  />
+                                )}
+                                <Text
+                                  style={{
+                                    color: on ? "#f2d78a" : "#b6cfae",
+                                    fontSize: T.meta,
+                                    fontWeight: "600",
+                                  }}
+                                >
+                                  {t(`categories.${id}`, { defaultValue: id })}
+                                </Text>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
+                      </View>
+                      {selectedCats.length > 0 && (
+                        <TouchableOpacity
+                          onPress={() => setSelectedCats([])}
+                          style={{
+                            alignSelf: "flex-start",
+                            paddingVertical: 8,
+                          }}
+                        >
+                          <Text
+                            style={{
+                              color: "#f2d78a",
+                              fontSize: T.meta,
+                              fontWeight: "700",
+                            }}
+                          >
+                            {t("area.clearCats")}
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  )}
+
+                  {!loading && (
                     <Text
                       style={{
-                        color: "#f2d78a",
+                        color: "#8aa483",
                         fontSize: T.meta,
-                        fontWeight: "700",
+                        paddingHorizontal: 18,
+                        paddingTop: 10,
                       }}
                     >
-                      {t("area.clearCats")}
+                      {t("area.resultsCount", { count: shown.length })}
                     </Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            )}
-
-            {!loading && (
-              <Text
-                style={{
-                  color: "#8aa483",
-                  fontSize: T.meta,
-                  paddingHorizontal: 18,
-                  paddingTop: 10,
-                }}
-              >
-                {t("area.resultsCount", { count: shown.length })}
-              </Text>
-            )}
-
-            {loading ? (
-              <ActivityIndicator style={{ marginTop: 40 }} color="#8fd06a" />
-            ) : (
-              <FlatList
-                data={shown}
-                keyExtractor={(p) => String(p.id)}
-                contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
-                ListEmptyComponent={
+                  )}
+                </View>
+              }
+              ListEmptyComponent={
+                loading ? (
+                  <ActivityIndicator
+                    style={{ marginTop: 40 }}
+                    color="#8fd06a"
+                  />
+                ) : (
                   <View style={{ alignItems: "center", marginTop: 40 }}>
                     <Ionicons
                       name={failed ? "cloud-offline-outline" : "map-outline"}
@@ -649,99 +869,17 @@ export function AreaActivitiesSheet({
                       {failed ? t("area.loadFailed") : t("area.empty")}
                     </Text>
                   </View>
-                }
-                renderItem={({ item, index }) => {
-                  const thumb = fullUrl(item.thumbnailPath || item.filePath);
-                  const km = postDistance(item);
-                  return (
-                    <TouchableOpacity
-                      style={{
-                        flexDirection: "row",
-                        gap: 12,
-                        padding: 10,
-                        borderRadius: 12,
-                        borderWidth: 1,
-                        borderColor: "#2f5a33",
-                        marginBottom: 10,
-                      }}
-                      onPress={() => setPagerAt(index)}
-                      accessibilityRole="button"
-                      accessibilityLabel={t("common.openPost")}
-                    >
-                      <Image
-                        source={{ uri: thumb }}
-                        style={{
-                          width: 72,
-                          height: 72,
-                          borderRadius: 8,
-                          backgroundColor: "#0d1f10",
-                        }}
-                        resizeMode="cover"
-                      />
-                      <View style={{ flex: 1, gap: 3 }}>
-                        <Text
-                          style={{
-                            color: "#fff",
-                            fontSize: T.body,
-                            fontWeight: "700",
-                          }}
-                          numberOfLines={1}
-                        >
-                          {item.title}
-                        </Text>
-                        {!!item.location && (
-                          <Text
-                            style={{ color: "#b6cfae", fontSize: T.meta }}
-                            numberOfLines={1}
-                          >
-                            {item.location}
-                          </Text>
-                        )}
-                        {item.isEvent && item.eventStartAt && (
-                          <Text
-                            style={{
-                              color: "#f2d78a",
-                              fontSize: T.meta,
-                              fontWeight: "700",
-                            }}
-                          >
-                            {eventWhen(item.eventStartAt)}
-                          </Text>
-                        )}
-                        {km !== null && (
-                          <View
-                            style={{
-                              flexDirection: "row",
-                              alignItems: "center",
-                              gap: 4,
-                              marginTop: 2,
-                            }}
-                          >
-                            <Ionicons
-                              name="navigate-outline"
-                              size={12}
-                              color="#8aa483"
-                            />
-                            {/* Gola brojka ne kaže od čega se mjeri; uz ime
-                                mjesta je odmah jasno. */}
-                            <Text
-                              style={{ color: "#8aa483", fontSize: T.meta }}
-                            >
-                              {km < 1
-                                ? `${Math.round(km * 1000)} m`
-                                : `${km.toFixed(1)} km`}
-                              {placeName
-                                ? ` ${t("area.from", { place: placeName })}`
-                                : ""}
-                            </Text>
-                          </View>
-                        )}
-                      </View>
-                    </TouchableOpacity>
-                  );
-                }}
-              />
-            )}
+                )
+              }
+              renderItem={({ item, index }) => (
+                <AreaPostCard
+                  item={item}
+                  km={postDistance(item)}
+                  placeName={placeName}
+                  onPress={() => setPagerAt(index)}
+                />
+              )}
+            />
           </SafeAreaView>
         </Pressable>
       </Pressable>

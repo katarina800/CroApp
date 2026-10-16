@@ -142,6 +142,7 @@ export default function SetPasswordScreen() {
 
       <View style={{ position: "relative", justifyContent: "center" }}>
         <TextInput
+          selectTextOnFocus
           style={s.input}
           placeholder="Nova lozinka"
           placeholderTextColor="#9AA9A7"
@@ -235,6 +236,7 @@ export default function SetPasswordScreen() {
 
       <View style={{ position: "relative", justifyContent: "center" }}>
         <TextInput
+          selectTextOnFocus
           style={s.input}
           placeholder="Potvrdi lozinku"
           placeholderTextColor="#9AA9A7"

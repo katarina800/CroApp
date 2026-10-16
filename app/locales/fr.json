@@ -55,7 +55,8 @@
     "settings": "Paramètres",
     "accept": "Accepter",
     "decline": "Refuser",
-    "comments": "Commentaires"
+    "comments": "Commentaires",
+    "unsavedChanges": "Tu as des modifications non enregistrées"
   },
   "auth": {
     "login": "Connexion",
@@ -377,7 +378,8 @@
     "filtersHint": "Choisis un rayon, un moment de la journée et des catégories. La carte se met à jour quand tu fermes ce panneau.",
     "searchCategories": "Rechercher une catégorie…",
     "noCategoryMatch": "Aucune catégorie de ce nom.",
-    "radiusUnit": "Rayon de recherche : {{km}} km"
+    "radiusUnit": "Rayon de recherche : {{km}} km",
+    "hideCircle": "Masquer le cercle"
   },
   "videos": {
     "title": "Vidéos",

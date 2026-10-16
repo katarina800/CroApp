@@ -40,6 +40,7 @@ import {
 import MapView, { Circle, Marker, Region } from "react-native-maps";
 import { useTheme } from "../../components/AdaptiveThemeProvider";
 import { PlanMyDayModal } from "../../components/PlanMyDayModal";
+import { UnsavedBar } from "../../components/UnsavedBar";
 import { T, TAP_SLOP, V, ag, dm, pb, pr, s } from "../../styles/varaTheme";
 import { API_BASE_URL } from "../config/api";
 import {
@@ -318,6 +319,9 @@ const STORAGE_GROUPS = "cromap_groups_v4";
 const STORAGE_NOTIFS = "cromap_notif_prefs_v4";
 const STORAGE_VISITS = "cromap_visits_v1";
 const STORAGE_TYPES = "cromap_selected_types_v1";
+const STORAGE_RADIUS = "cromap_map_radius_v1";
+/** Izbor radijusa pretrage (km) — isti na karti i na ploči s filterima. */
+const RADIUS_CHOICES = [5, 10, 25, 50, 100] as const;
 
 // Karta se prije otvarala prazna: dok korisnik sam ne otvori "Kategorije" i
 // nešto označi, na njoj nema ničega, pa prvi dojam ne pokaže što aplikacija
@@ -815,6 +819,43 @@ const UI_STYLES = StyleSheet.create({
     marginHorizontal: 8,
     marginVertical: 3,
   },
+  radiusPicker: {
+    position: "absolute",
+    right: 12 + 64 + 8,
+    width: 112,
+    padding: 8,
+    gap: 6,
+    borderRadius: 16,
+    backgroundColor: "rgba(26,46,21,0.96)",
+    borderWidth: 1,
+    borderColor: V.borderGreen,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 9,
+  },
+  radiusPickerTitle: {
+    color: V.silverDim,
+    fontSize: 10.5,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+    textAlign: "center",
+  },
+  radiusChip: {
+    paddingVertical: 9,
+    borderRadius: 10,
+    alignItems: "center",
+    backgroundColor: V.forestMid,
+    borderWidth: 1,
+    borderColor: V.borderDim,
+  },
+  radiusChipOn: { backgroundColor: V.primary, borderColor: V.primary },
+  radiusChipTxt: { color: V.silverBright, fontSize: T.meta, fontWeight: "700" },
+  radiusChipTxtOn: { color: V.onPrimary },
+  radiusHide: { paddingVertical: 6, alignItems: "center" },
+  radiusHideTxt: { color: V.silverDim, fontSize: 12, fontWeight: "600" },
   mapCtrlActiveDot: {
     position: "absolute",
     top: 3,
@@ -2296,6 +2337,17 @@ function NotificationSettingsModal({
   useEffect(() => {
     setP(prefs);
   }, [visible, prefs]);
+  const notifDirty =
+    JSON.stringify({
+      ...p,
+      categories: [...p.categories].sort(),
+      ageGroups: [...(p.ageGroups ?? [])].sort(),
+    }) !==
+    JSON.stringify({
+      ...prefs,
+      categories: [...prefs.categories].sort(),
+      ageGroups: [...(prefs.ageGroups ?? [])].sort(),
+    });
 
   const toggle = (cat: string) =>
     setP((prev) => ({
@@ -2435,7 +2487,7 @@ function NotificationSettingsModal({
         </View>
 
         <ScrollView
-          contentContainerStyle={{ paddingBottom: 40 }}
+          contentContainerStyle={{ paddingBottom: 110 }}
           style={{ backgroundColor: DC.bg }}
         >
           {/* App notifikacije toggle */}
@@ -2518,6 +2570,7 @@ function NotificationSettingsModal({
 
             {p.emailEnabled && (
               <TextInput
+                selectTextOnFocus
                 style={{
                   marginTop: 10,
                   backgroundColor: DC.card,
@@ -2779,35 +2832,19 @@ function NotificationSettingsModal({
               })}
             </View>
           </View>
-
-          {/* Spremi gumb */}
-          <TouchableOpacity
-            style={{
-              margin: 16,
-              marginTop: 20,
-              backgroundColor: DC.cardHover,
-              borderRadius: 12,
-              borderWidth: 1.5,
-              borderColor: DC.border,
-              paddingVertical: 16,
-              alignItems: "center",
-            }}
-            onPress={() => {
-              onSave(p);
-              onClose();
-              Alert.alert(
-                t("profile.savedSuccess"),
-                t("profile.updateSettingsSuccess"),
-              );
-            }}
-          >
-            <Text
-              style={{ color: DC.text, fontSize: T.lead, fontWeight: "700" }}
-            >
-              {t("common.save")}
-            </Text>
-          </TouchableOpacity>
         </ScrollView>
+        {/* Spremi: traka se pojavi kad ima promjena, uvijek uz donji rub */}
+        <UnsavedBar
+          visible={notifDirty}
+          onPress={() => {
+            onSave(p);
+            onClose();
+            Alert.alert(
+              t("profile.savedSuccess"),
+              t("profile.updateSettingsSuccess"),
+            );
+          }}
+        />
       </View>
     </Modal>
   );
@@ -3899,6 +3936,7 @@ export function ActivityGroupsModal({
               ]}
             >
               <TextInput
+                selectTextOnFocus
                 style={[
                   ag.input,
                   {
@@ -4238,6 +4276,7 @@ export function ActivityGroupsModal({
                 {t("groups.activityDesc")}
               </Text>
               <TextInput
+                selectTextOnFocus
                 style={{
                   backgroundColor: DC.card,
                   borderRadius: 10,
@@ -4277,6 +4316,7 @@ export function ActivityGroupsModal({
                 {t("groups.location")}
               </Text>
               <TextInput
+                selectTextOnFocus
                 style={{
                   backgroundColor: DC.card,
                   borderRadius: 10,
@@ -9819,6 +9859,17 @@ export default function DashboardScreen() {
   // ništa ne sprema, inače bi početni [] pregazio spremljeni izbor.
   const typesLoadedRef = useRef(false);
   const [radius, setRadius] = useState(5);
+  const [showRadiusPicker, setShowRadiusPicker] = useState(false);
+  // Zapamćen radijus iz prošlog korištenja.
+  useEffect(() => {
+    loadJSON<number>(STORAGE_RADIUS, 5).then((r) => {
+      if ((RADIUS_CHOICES as readonly number[]).includes(r)) setRadius(r);
+    });
+  }, []);
+  const chooseRadius = useCallback((km: number) => {
+    setRadius(km);
+    saveJSON(STORAGE_RADIUS, km);
+  }, []);
   // Svi pronađeni rezultati (neograničeni)
   const [allPlaces, setAllPlaces] = useState<Place[]>([]);
   // Broj koji se prikazuje na karti
@@ -11193,6 +11244,7 @@ export default function DashboardScreen() {
       <View style={s.topBar}>
         <View style={s.citySearchRow}>
           <TextInput
+            selectTextOnFocus
             style={s.cityInput}
             placeholder={t("map.searchCityPlaceholder")}
             placeholderTextColor="#999"
@@ -11557,9 +11609,14 @@ export default function DashboardScreen() {
           />
           <MapCtrlButton
             icon={APP_ICONS.radius}
-            label={t("map.radiusBtn")}
+            label={`${radius} km`}
             active={showRadiusCircle}
-            onPress={() => setShowRadiusCircle((v) => !v)}
+            onPress={() => {
+              // Prvi dodir pokaže krug i ponudi izbor radijusa; sljedeći
+              // dodir zatvara izbor.
+              setShowRadiusCircle(true);
+              setShowRadiusPicker((v) => !v);
+            }}
           />
           {/* Gleda se centar karte, pa radi i nakon pretrage i nakon
               običnog pomicanja na drugi kraj. */}
@@ -11585,6 +11642,51 @@ export default function DashboardScreen() {
             active={showOnlyVisited}
             onPress={() => setShowOnlyVisited((v) => !v)}
           />
+        </View>
+      )}
+
+      {/* Brzi izbor radijusa — lijevo od ploče s kontrolama */}
+      {showMapCtrlPanel && showRadiusPicker && (
+        <View
+          style={[
+            UI_STYLES.radiusPicker,
+            { top: Platform.OS === "ios" ? 262 : 238 },
+          ]}
+        >
+          <Text style={UI_STYLES.radiusPickerTitle}>{t("map.radius")}</Text>
+          {RADIUS_CHOICES.map((km) => {
+            const on = km === radius;
+            return (
+              <TouchableOpacity
+                key={km}
+                style={[UI_STYLES.radiusChip, on && UI_STYLES.radiusChipOn]}
+                onPress={() => {
+                  chooseRadius(km);
+                  setShowRadiusPicker(false);
+                }}
+                accessibilityRole="button"
+                accessibilityState={{ selected: on }}
+              >
+                <Text
+                  style={[
+                    UI_STYLES.radiusChipTxt,
+                    on && UI_STYLES.radiusChipTxtOn,
+                  ]}
+                >
+                  {km} km
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+          <TouchableOpacity
+            style={UI_STYLES.radiusHide}
+            onPress={() => {
+              setShowRadiusCircle(false);
+              setShowRadiusPicker(false);
+            }}
+          >
+            <Text style={UI_STYLES.radiusHideTxt}>{t("map.hideCircle")}</Text>
+          </TouchableOpacity>
         </View>
       )}
 
@@ -11685,7 +11787,7 @@ export default function DashboardScreen() {
                 </Text>
               </View>
               <View style={{ flexDirection: "row", gap: 6 }}>
-                {[1, 5, 10, 20, 50, 100].map((r) => {
+                {RADIUS_CHOICES.map((r) => {
                   const active = radius === r;
                   return (
                     <TouchableOpacity
@@ -11699,7 +11801,7 @@ export default function DashboardScreen() {
                         borderWidth: active ? 2 : 1,
                         borderColor: active ? DC.border : DC.borderDim,
                       }}
-                      onPress={() => setRadius(r)}
+                      onPress={() => chooseRadius(r)}
                       accessibilityRole="button"
                       accessibilityState={{ selected: active }}
                     >
@@ -11856,6 +11958,7 @@ export default function DashboardScreen() {
                 )}
               </View>
               <TextInput
+                selectTextOnFocus
                 value={categoryQuery}
                 onChangeText={setCategoryQuery}
                 placeholder={t("map.searchCategories")}

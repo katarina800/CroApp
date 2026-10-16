@@ -1886,6 +1886,7 @@ export function PlanMyDayModal({
                   style={{ position: "relative", justifyContent: "center" }}
                 >
                   <TextInput
+                    selectTextOnFocus
                     style={{
                       backgroundColor: DC.card,
                       borderRadius: 12,
@@ -2368,6 +2369,7 @@ export function PlanMyDayModal({
                         €
                       </Text>
                       <TextInput
+                        selectTextOnFocus
                         style={{
                           flex: 1,
                           fontSize: T.lead,

@@ -55,7 +55,8 @@
     "settings": "Einstellungen",
     "accept": "Annehmen",
     "decline": "Ablehnen",
-    "comments": "Kommentare"
+    "comments": "Kommentare",
+    "unsavedChanges": "Du hast nicht gespeicherte Änderungen"
   },
   "auth": {
     "login": "Anmeldung",
@@ -365,7 +366,8 @@
     "filtersHint": "Wähle Radius, Tageszeit und Kategorien. Die Karte aktualisiert sich, sobald du das Panel schließt.",
     "searchCategories": "Kategorie suchen…",
     "noCategoryMatch": "Keine Kategorie mit diesem Namen.",
-    "radiusUnit": "Suchradius: {{km}} km"
+    "radiusUnit": "Suchradius: {{km}} km",
+    "hideCircle": "Kreis ausblenden"
   },
   "password": {
     "minLength": "Min. 6 Zeichen",

@@ -765,6 +765,7 @@ export default function SearchScreen() {
             style={{ marginRight: 8 }}
           />
           <TextInput
+            selectTextOnFocus
             style={styles.searchInput}
             placeholder={t("search.placeholder")}
             placeholderTextColor={V.placeholder}

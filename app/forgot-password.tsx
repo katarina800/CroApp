@@ -53,14 +53,11 @@ export default function ForgotPasswordScreen() {
     }
     setIsLoading(true);
     try {
-      const response = await fetch(
-        API_ENDPOINTS.FORGOT_PASSWORD,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: contact.trim() }),
-        },
-      );
+      const response = await fetch(API_ENDPOINTS.FORGOT_PASSWORD, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: contact.trim() }),
+      });
 
       if (response.ok) {
         setEmail(contact.trim());
@@ -167,20 +164,17 @@ export default function ForgotPasswordScreen() {
     }
     setIsLoading(true);
     try {
-      const response = await fetch(
-        API_ENDPOINTS.RESET_PASSWORD,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          // Umjesto šest znamenki šalje se dozvola koju je poslužitelj izdao
-          // nakon što je kod provjerio; veže se uz e-mail baš tog računa.
-          body: JSON.stringify({
-            email: (email || contact).trim(),
-            resetToken,
-            newPassword,
-          }),
-        },
-      );
+      const response = await fetch(API_ENDPOINTS.RESET_PASSWORD, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        // Umjesto šest znamenki šalje se dozvola koju je poslužitelj izdao
+        // nakon što je kod provjerio; veže se uz e-mail baš tog računa.
+        body: JSON.stringify({
+          email: (email || contact).trim(),
+          resetToken,
+          newPassword,
+        }),
+      });
       if (response.ok) {
         Alert.alert(
           t("forgotPassword.successTitle"),
@@ -268,6 +262,7 @@ export default function ForgotPasswordScreen() {
             <View style={styles.form}>
               <Text style={styles.label}>{t("forgotPassword.emailLabel")}</Text>
               <TextInput
+                selectTextOnFocus
                 style={styles.input}
                 placeholder={t("forgotPassword.emailPlaceholder")}
                 placeholderTextColor="#9AA9A7"
@@ -299,6 +294,7 @@ export default function ForgotPasswordScreen() {
             <View style={styles.form}>
               <Text style={styles.label}>{t("forgotPassword.codeLabel")}</Text>
               <TextInput
+                selectTextOnFocus
                 style={[styles.input, styles.codeInput]}
                 placeholder="123456"
                 placeholderTextColor="#9AA9A7"
@@ -361,6 +357,7 @@ export default function ForgotPasswordScreen() {
               </Text>
               <View style={{ position: "relative", justifyContent: "center" }}>
                 <TextInput
+                  selectTextOnFocus
                   style={styles.input}
                   placeholder={t("forgotPassword.newPasswordPlaceholder")}
                   placeholderTextColor="#9AA9A7"
@@ -397,6 +394,7 @@ export default function ForgotPasswordScreen() {
               </Text>
               <View style={{ position: "relative", justifyContent: "center" }}>
                 <TextInput
+                  selectTextOnFocus
                   style={[
                     styles.input,
                     confirmPassword && newPassword !== confirmPassword

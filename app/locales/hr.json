@@ -55,7 +55,8 @@
     "settings": "Postavke",
     "accept": "Prihvati",
     "decline": "Odbij",
-    "comments": "Komentari"
+    "comments": "Komentari",
+    "unsavedChanges": "Imaš nespremljene promjene"
   },
   "auth": {
     "login": "Prijava",
@@ -362,7 +363,8 @@
     "filtersHint": "Odaberi radijus, doba dana i kategorije. Karta se osvježi kad zatvoriš ploču.",
     "searchCategories": "Traži kategoriju…",
     "noCategoryMatch": "Nema kategorije s tim imenom.",
-    "radiusUnit": "Radijus pretrage: {{km}} km"
+    "radiusUnit": "Radijus pretrage: {{km}} km",
+    "hideCircle": "Sakrij krug"
   },
   "notif": {
     "unavailableTitle": "Obavijesti nisu dostupne",
