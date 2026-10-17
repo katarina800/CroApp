@@ -56,7 +56,9 @@
     "accept": "Accetta",
     "decline": "Rifiuta",
     "comments": "Commenti",
-    "unsavedChanges": "Hai modifiche non salvate"
+    "unsavedChanges": "Hai modifiche non salvate",
+    "sessionExpired": "La sessione è scaduta. Accedi di nuovo.",
+    "requestTimeout": "La richiesta ha impiegato troppo. Controlla la connessione e riprova."
   },
   "auth": {
     "login": "Accesso",
@@ -384,7 +386,6 @@
   },
   "videos": {
     "title": "Video",
-    "members": "membri",
     "savedToBoxTitle": "Salvato nel Contenitore",
     "savedToBoxDesc": "Puoi rivedere questo video nel tuo profilo, nella sezione Contenitore.",
     "addedToWishlistTitle": "Aggiunto alla Lista dei desideri",
@@ -934,8 +935,6 @@
     "distanceFromAccommodation": "📏 Distanza dall'alloggio",
     "venueSelected": "Selezionato",
     "shareFailed": "Impossibile condividere il piano.",
-    "numberOfVenues": "Numero di opzioni offerte per categoria",
-    "minVenues": "min. {{count}} opzioni",
     "fetchingPlacesFrom": "Recupero luoghi reali da {{destination}}...",
     "destinationPlaceholder": "Città o luogo (es. Spalato)",
     "postalCode": "CAP",

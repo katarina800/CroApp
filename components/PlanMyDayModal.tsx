@@ -43,6 +43,7 @@ import { T, pb } from "../styles/varaTheme";
 // Ikone (nove; stare viking kovanice su u LEGACY_ICONS, prekidač USE_LEGACY_ICONS).
 import { APP_ICONS } from "../constants/icons";
 import { useTheme } from "./AdaptiveThemeProvider";
+import { getToken } from "@/utils/tokenStore";
 
 // ---------------------------------------------------------------------------
 // Tipovi
@@ -1377,7 +1378,7 @@ export function PlanMyDayModal({
       // pucalo jer je ruta /api/plan-ratings namjerno dostupna i bez
       // prijave — samo se tiho gubilo tko je ocijenio.
       const [token, firstName, lastName] = await Promise.all([
-        AsyncStorage.getItem("token"),
+        getToken(),
         AsyncStorage.getItem("firstName"),
         AsyncStorage.getItem("lastName"),
       ]);
@@ -1421,7 +1422,7 @@ export function PlanMyDayModal({
     locationDebounceRef.current = setTimeout(async () => {
       setSearchingLocation(true);
       try {
-        const token = await AsyncStorage.getItem("token");
+        const token = await getToken();
         const res = await fetch(
           `${API_BASE_URL}/api/locationsearch/autocomplete?query=${encodeURIComponent(query.trim())}`,
           token ? { headers: { Authorization: `Bearer ${token}` } } : undefined,

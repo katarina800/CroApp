@@ -3,6 +3,7 @@ import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { clearToken } from "@/utils/tokenStore";
 
 export default function HomeScreen() {
   const { t } = useTranslation();
@@ -31,7 +32,7 @@ export default function HomeScreen() {
         text: t("auth.logout"),
         style: "destructive",
         onPress: async () => {
-          await AsyncStorage.removeItem("token");
+          await clearToken();
           await AsyncStorage.removeItem("firstName");
           await AsyncStorage.removeItem("lastName");
           await AsyncStorage.removeItem("username");

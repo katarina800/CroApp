@@ -10,6 +10,7 @@ import { useState } from "react";
 import { Alert } from "react-native";
 import { useTranslation } from "react-i18next";
 import { API_ENDPOINTS } from "../app/config/api";
+import { setToken } from "@/utils/tokenStore";
 
 GoogleSignin.configure({
   webClientId:
@@ -75,7 +76,7 @@ export function useGoogleAuth() {
         return;
       }
 
-      await AsyncStorage.setItem("token", data.token);
+      await setToken(data.token);
       await AsyncStorage.setItem("userId", data.userId.toString());
       await AsyncStorage.setItem("firstName", data.firstName ?? "");
       await AsyncStorage.setItem("lastName", data.lastName ?? "");

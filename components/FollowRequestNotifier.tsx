@@ -18,6 +18,7 @@ import { useTranslation } from "react-i18next";
 import { Alert, AppState } from "react-native";
 import { API_BASE_URL } from "../app/config/api";
 import { useActivePolling } from "@/hooks/use-active-polling";
+import { getToken } from "@/utils/tokenStore";
 
 const POLL_INTERVAL_MS = 60_000;
 // Zahtjevi na koje je korisnik rekao "Kasnije" pamte se da ga se ne pita
@@ -41,7 +42,7 @@ export default function FollowRequestNotifier() {
   const respond = useCallback(
     async (requesterId: number, action: "accept" | "decline") => {
       try {
-        const token = await AsyncStorage.getItem("token");
+        const token = await getToken();
         if (!token) return;
         await fetch(
           `${API_BASE_URL}/api/follow/requests/${requesterId}/${action}`,
@@ -76,7 +77,7 @@ export default function FollowRequestNotifier() {
     if (showingRef.current) return;
 
     try {
-      const token = await AsyncStorage.getItem("token");
+      const token = await getToken();
       if (!token) return;
 
       const res = await fetch(`${API_BASE_URL}/api/follow/requests`, {

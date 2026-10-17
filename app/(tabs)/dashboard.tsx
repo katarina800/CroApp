@@ -72,6 +72,7 @@ import {
   placeCategories,
   searchPlaces,
 } from "../services/locationService";
+import { getToken } from "@/utils/tokenStore";
 
 function getDashColors(isDark: boolean) {
   return {
@@ -1104,7 +1105,7 @@ async function fetchGoogleDetails(
 // ─── Backend: visits ─────────────────────────────────────────────────────────
 async function backendAddVisit(v: VisitRecord) {
   try {
-    const t = await AsyncStorage.getItem("token");
+    const t = await getToken();
     if (!t) return false;
     const r = await fetch(`${API_BASE_URL}/api/visits`, {
       method: "POST",
@@ -1121,7 +1122,7 @@ async function backendAddVisit(v: VisitRecord) {
 }
 async function backendGetVisits(): Promise<VisitRecord[]> {
   try {
-    const t = await AsyncStorage.getItem("token");
+    const t = await getToken();
     if (!t) return [];
     const r = await fetch(`${API_BASE_URL}/api/visits`, {
       headers: { Authorization: `Bearer ${t}` },
@@ -1135,7 +1136,7 @@ async function backendGetVisits(): Promise<VisitRecord[]> {
 }
 async function backendDeleteVisit(id: string) {
   try {
-    const t = await AsyncStorage.getItem("token");
+    const t = await getToken();
     if (!t) return false;
     const r = await fetch(`${API_BASE_URL}/api/visits/${id}`, {
       method: "DELETE",
@@ -1684,7 +1685,7 @@ function PlaceDetailModal({
     if (!place || !reportText.trim()) return;
     setSendingReport(true);
     try {
-      const token = await AsyncStorage.getItem("token");
+      const token = await getToken();
       const [firstName, lastName, username] = await Promise.all([
         AsyncStorage.getItem("firstName"),
         AsyncStorage.getItem("lastName"),
@@ -2943,7 +2944,7 @@ export function ActivityGroupsModal({
 
   const loadMyName = async () => {
     try {
-      const token = await AsyncStorage.getItem("token");
+      const token = await getToken();
       if (token) {
         const res = await fetch(`${API_BASE_URL}/api/auth/my-profile`, {
           headers: { Authorization: `Bearer ${token}` },
@@ -3009,7 +3010,7 @@ export function ActivityGroupsModal({
 
   const fetchMemberAvatars = async (members: string[]) => {
     try {
-      const token = await AsyncStorage.getItem("token");
+      const token = await getToken();
       if (!token) return;
 
       // Korak 1: dohvati listu korisnika da dobiješ ID-eve
@@ -3074,7 +3075,7 @@ export function ActivityGroupsModal({
 
   const loadGroups = async () => {
     try {
-      const token = await AsyncStorage.getItem("token");
+      const token = await getToken();
       if (!token) return;
 
       const res = await fetch(`${API_BASE_URL}/api/activity-groups`, {
@@ -3144,7 +3145,7 @@ export function ActivityGroupsModal({
       return;
     }
     try {
-      const token = await AsyncStorage.getItem("token");
+      const token = await getToken();
       const res = await fetch(
         `${API_BASE_URL}/api/locationsearch/autocomplete?query=${encodeURIComponent(
           query.trim(),
@@ -3210,7 +3211,7 @@ export function ActivityGroupsModal({
     }
 
     try {
-      const token = await AsyncStorage.getItem("token");
+      const token = await getToken();
       if (!token) {
         Alert.alert(t("common.error"), t("auth.notLoggedIn"));
         return;
@@ -3288,7 +3289,7 @@ export function ActivityGroupsModal({
   // ============================================================
   const joinGroup = async (groupId: string) => {
     try {
-      const token = await AsyncStorage.getItem("token");
+      const token = await getToken();
       if (!token) {
         Alert.alert(t("common.error"), t("auth.notLoggedIn"));
         return;
@@ -3327,7 +3328,7 @@ export function ActivityGroupsModal({
   // ============================================================
   const leaveGroup = async (groupId: string) => {
     try {
-      const token = await AsyncStorage.getItem("token");
+      const token = await getToken();
       if (!token) {
         Alert.alert(t("common.error"), t("auth.notLoggedIn"));
         return;
@@ -3364,7 +3365,7 @@ export function ActivityGroupsModal({
     if (!chatMsg.trim()) return;
 
     try {
-      const token = await AsyncStorage.getItem("token");
+      const token = await getToken();
       if (!token) return;
 
       const res = await fetch(
@@ -3398,7 +3399,7 @@ export function ActivityGroupsModal({
   // ============================================================
   const loadGroupMessages = async (groupId: string) => {
     try {
-      const token = await AsyncStorage.getItem("token");
+      const token = await getToken();
       if (!token) return;
 
       const res = await fetch(
@@ -3459,7 +3460,7 @@ export function ActivityGroupsModal({
 
   const confirmDeleteGroup = async (groupId: string) => {
     try {
-      const token = await AsyncStorage.getItem("token");
+      const token = await getToken();
       if (!token) return;
       const res = await fetch(
         `${API_BASE_URL}/api/activity-groups/${groupId}?creatorName=${encodeURIComponent(myName)}`,
@@ -3512,7 +3513,7 @@ export function ActivityGroupsModal({
       return;
     }
     try {
-      const token = await AsyncStorage.getItem("token");
+      const token = await getToken();
       const res = await fetch(`${API_BASE_URL}/api/auth/users`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -3578,7 +3579,7 @@ export function ActivityGroupsModal({
     }
     setSendingDM(true);
     try {
-      const token = await AsyncStorage.getItem("token");
+      const token = await getToken();
       const res = await fetch(`${API_BASE_URL}/api/message/send`, {
         method: "POST",
         headers: {
@@ -6451,7 +6452,7 @@ function venueToPlace(
 //       if (loadingInterval.current) clearInterval(loadingInterval.current);
 //       setLoadingStep(5);
 
-//       const token = await AsyncStorage.getItem("token");
+//       const token = await getToken();
 //       let text = "";
 
 //       const venueStr = Object.entries(venues)

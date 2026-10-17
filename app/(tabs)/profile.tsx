@@ -36,6 +36,7 @@ import { getVara } from "../../styles/adaptiveVara";
 import { ErrorBanner } from "../../components/StateView";
 import { saveLanguage } from "../config/i18n";
 import { T } from "../../styles/varaTheme";
+import { getToken, clearToken } from "@/utils/tokenStore";
 
 const { width: SCREEN_W } = Dimensions.get("window");
 
@@ -848,7 +849,7 @@ function AvatarSection({ onUpdate }: { onUpdate: () => void }) {
     setShowAvatarModal(false);
     setLoading(true);
     try {
-      const token = await AsyncStorage.getItem("token");
+      const token = await getToken();
       const res = await fetch(`${API_BASE_URL}/api/auth/profile-photo`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
@@ -869,7 +870,7 @@ function AvatarSection({ onUpdate }: { onUpdate: () => void }) {
     setShowAvatarModal(false);
     setLoading(true);
     try {
-      const token = await AsyncStorage.getItem("token");
+      const token = await getToken();
       const res = await fetch(`${API_BASE_URL}/api/auth/profile-photo/avatar`, {
         method: "PUT",
         headers: {
@@ -918,7 +919,7 @@ function AvatarSection({ onUpdate }: { onUpdate: () => void }) {
   const uploadAvatar = async (uri: string) => {
     setLoading(true);
     try {
-      const token = await AsyncStorage.getItem("token");
+      const token = await getToken();
       const formData = new FormData();
       formData.append("avatar", {
         uri,
@@ -1364,7 +1365,7 @@ function FollowListModal({
   const loadList = async () => {
     setLoading(true);
     try {
-      const token = await AsyncStorage.getItem("token");
+      const token = await getToken();
       const endpoint =
         type === "followers"
           ? `${API_BASE_URL}/api/follow/followers/${userId}`
@@ -1441,7 +1442,7 @@ function FollowListModal({
     const doToggle = async () => {
       setProcessingId(targetUserId);
       try {
-        const token = await AsyncStorage.getItem("token");
+        const token = await getToken();
         const res = !currentStatus
           ? await fetch(
               `${API_BASE_URL}/api/golden-friends/add/${targetUserId}`,
@@ -1504,7 +1505,7 @@ function FollowListModal({
     const doBlock = async () => {
       setProcessingId(targetUserId);
       try {
-        const token = await AsyncStorage.getItem("token");
+        const token = await getToken();
         try {
           const checkFollow = await fetch(
             `${API_BASE_URL}/api/follow/is-following/${targetUserId}`,
@@ -1550,7 +1551,7 @@ function FollowListModal({
     const doUnblock = async () => {
       setProcessingId(targetUserId);
       try {
-        const token = await AsyncStorage.getItem("token");
+        const token = await getToken();
         const res = await fetch(
           `${API_BASE_URL}/api/block/unblock/${targetUserId}`,
           { method: "DELETE", headers: { Authorization: `Bearer ${token}` } },
@@ -1754,7 +1755,7 @@ function FollowRequestsModal({
   const loadList = async () => {
     setLoading(true);
     try {
-      const token = await AsyncStorage.getItem("token");
+      const token = await getToken();
       const res = await fetch(`${API_BASE_URL}/api/follow/requests`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -1783,7 +1784,7 @@ function FollowRequestsModal({
   ) => {
     setProcessingId(requesterId);
     try {
-      const token = await AsyncStorage.getItem("token");
+      const token = await getToken();
       const res = await fetch(
         `${API_BASE_URL}/api/follow/requests/${requesterId}/${accept ? "accept" : "decline"}`,
         {
@@ -1985,7 +1986,7 @@ function ActivityArchive({ userId }: { userId: number | null }) {
   const loadStats = async () => {
     setLoading(true);
     try {
-      const token = await AsyncStorage.getItem("token");
+      const token = await getToken();
       const res = await fetch(
         `${API_BASE_URL}/api/activity/stats?period=${period}`,
         { headers: { Authorization: `Bearer ${token}` } },
@@ -2466,7 +2467,7 @@ function ScreenTimeCountdown() {
         {
           text: "OK",
           onPress: async () => {
-            await AsyncStorage.removeItem("token");
+            await clearToken();
             router.replace("/login");
           },
         },
@@ -2632,7 +2633,7 @@ function MeTab({ userId }: { userId: number | null }) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const token = await AsyncStorage.getItem("token");
+      const token = await getToken();
       const res = await fetch(`${API_BASE_URL}/api/media/my-media`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -2720,7 +2721,7 @@ function MeTab({ userId }: { userId: number | null }) {
   };
 
   const deleteItem = async (id: number) => {
-    const token = await AsyncStorage.getItem("token");
+    const token = await getToken();
     try {
       let res = await fetch(`${API_BASE_URL}/api/media/${id}`, {
         method: "DELETE",
@@ -2770,7 +2771,7 @@ function MeTab({ userId }: { userId: number | null }) {
       const asset = result.assets[0];
       setUploading(true);
       try {
-        const token = await AsyncStorage.getItem("token");
+        const token = await getToken();
         let uid = await AsyncStorage.getItem("userId");
         if (!uid || uid === "0") {
           try {
@@ -2915,7 +2916,7 @@ function BoxTab() {
   useEffect(() => {
     (async () => {
       try {
-        const token = await AsyncStorage.getItem("token");
+        const token = await getToken();
         const res = await fetch(`${API_BASE_URL}/api/savedvideo/my-saved`, {
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -2928,7 +2929,7 @@ function BoxTab() {
   }, []);
 
   const removeFromBox = async (videoId: number) => {
-    const token = await AsyncStorage.getItem("token");
+    const token = await getToken();
     const userId = await AsyncStorage.getItem("userId");
     try {
       const res = await fetch(
@@ -3070,7 +3071,7 @@ function WishlistTab() {
   useEffect(() => {
     (async () => {
       try {
-        const token = await AsyncStorage.getItem("token");
+        const token = await getToken();
         const res = await fetch(
           `${API_BASE_URL}/api/wishlistvideo/my-wishlist`,
           { headers: { Authorization: `Bearer ${token}` } },
@@ -3090,7 +3091,7 @@ function WishlistTab() {
   });
 
   const removeFromWishlist = async (videoId: number) => {
-    const token = await AsyncStorage.getItem("token");
+    const token = await getToken();
     const userId = await AsyncStorage.getItem("userId");
     try {
       const res = await fetch(
@@ -3120,7 +3121,7 @@ function WishlistTab() {
   };
 
   const setGoingStatus = async (item: WishlistItem, value: boolean) => {
-    const token = await AsyncStorage.getItem("token");
+    const token = await getToken();
     // Ako je korisnik kliknuo na već aktivno stanje → resetiraj na neodlučeno
     const newVal = item.isGoing === value ? undefined : value;
     try {
@@ -3329,7 +3330,7 @@ function GoldenFriendsTab({
   useEffect(() => {
     (async () => {
       try {
-        const token = await AsyncStorage.getItem("token");
+        const token = await getToken();
         const res = await fetch(`${API_BASE_URL}/api/golden-friends`, {
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -3356,7 +3357,7 @@ function GoldenFriendsTab({
         text: t("common.remove"),
         style: "destructive",
         onPress: async () => {
-          const token = await AsyncStorage.getItem("token");
+          const token = await getToken();
           await fetch(`${API_BASE_URL}/api/golden-friends/remove/${userId}`, {
             method: "DELETE",
             headers: { Authorization: `Bearer ${token}` },
@@ -3657,7 +3658,7 @@ function SettingsModal({
   const saveSettings = async () => {
     setSaving(true);
     try {
-      const token = await AsyncStorage.getItem("token");
+      const token = await getToken();
       const res = await fetch(`${API_BASE_URL}/api/auth/settings`, {
         method: "PUT",
         headers: {
@@ -3713,7 +3714,7 @@ function SettingsModal({
 
   const loadBlocked = async () => {
     try {
-      const token = await AsyncStorage.getItem("token");
+      const token = await getToken();
       const res = await fetch(`${API_BASE_URL}/api/block/blocked-users`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -3723,7 +3724,7 @@ function SettingsModal({
   };
 
   const unblockUser = async (userId: number) => {
-    const token = await AsyncStorage.getItem("token");
+    const token = await getToken();
     await fetch(`${API_BASE_URL}/api/block/unblock/${userId}`, {
       method: "DELETE",
       headers: { Authorization: `Bearer ${token}` },
@@ -3767,7 +3768,7 @@ function SettingsModal({
         style: "destructive",
         onPress: async () => {
           try {
-            const token = await AsyncStorage.getItem("token");
+            const token = await getToken();
             const res = await fetch(`${API_BASE_URL}/api/auth/delete-account`, {
               method: "DELETE",
               headers: { Authorization: `Bearer ${token}` },
@@ -3796,7 +3797,7 @@ function SettingsModal({
     }
     setSendingReport(true);
     try {
-      const token = await AsyncStorage.getItem("token");
+      const token = await getToken();
       const res = await fetch(`${API_BASE_URL}/api/support/report`, {
         method: "POST",
         headers: {
@@ -4547,7 +4548,7 @@ export default function ProfileScreen() {
 
   const loadPendingRequestsCount = useCallback(async () => {
     try {
-      const token = await AsyncStorage.getItem("token");
+      const token = await getToken();
       const res = await fetch(`${API_BASE_URL}/api/follow/requests`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -4560,7 +4561,7 @@ export default function ProfileScreen() {
 
   const load = useCallback(async () => {
     try {
-      const token = await AsyncStorage.getItem("token");
+      const token = await getToken();
       try {
         const res = await fetch(`${API_BASE_URL}/api/auth/my-profile`, {
           headers: { Authorization: `Bearer ${token}` },
@@ -4629,7 +4630,7 @@ export default function ProfileScreen() {
             {
               text: "OK",
               onPress: async () => {
-                await AsyncStorage.removeItem("token");
+                await clearToken();
                 router.replace("/login");
               },
             },

@@ -21,6 +21,7 @@ import {
 import { API_ENDPOINTS } from "./config/api";
 import { T } from "../styles/varaTheme";
 import { KeyboardSafeScrollView } from "../components/KeyboardSafeScrollView";
+import { apiFetch, describeNetworkError } from "@/utils/apiFetch";
 
 /** Poslužitelj ne šalje novi kod češće od jednom u minuti. */
 const RESEND_SECONDS = 60;
@@ -48,8 +49,9 @@ export default function VerifyEmailScreen() {
   const requestCode = async (silent: boolean) => {
     if (!email) return;
     try {
-      const response = await fetch(API_ENDPOINTS.RESEND_VERIFICATION, {
+      const response = await apiFetch(API_ENDPOINTS.RESEND_VERIFICATION, {
         method: "POST",
+        auth: false,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
       });
@@ -61,8 +63,8 @@ export default function VerifyEmailScreen() {
       if (!silent) {
         Alert.alert(t("verifyEmail.title"), t("verifyEmail.resent"));
       }
-    } catch {
-      if (!silent) Alert.alert(t("common.error"), t("common.networkError"));
+    } catch (err) {
+      if (!silent) Alert.alert(t("common.error"), describeNetworkError(err, t));
     }
   };
 
@@ -82,8 +84,9 @@ export default function VerifyEmailScreen() {
     }
     setIsLoading(true);
     try {
-      const response = await fetch(API_ENDPOINTS.VERIFY_EMAIL, {
+      const response = await apiFetch(API_ENDPOINTS.VERIFY_EMAIL, {
         method: "POST",
+        auth: false,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, code: code.trim() }),
       });
@@ -103,8 +106,8 @@ export default function VerifyEmailScreen() {
       } else {
         Alert.alert(t("common.error"), t("verifyEmail.invalidCode"));
       }
-    } catch {
-      Alert.alert(t("common.error"), t("common.networkError"));
+    } catch (err) {
+      Alert.alert(t("common.error"), describeNetworkError(err, t));
     } finally {
       setIsLoading(false);
     }

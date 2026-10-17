@@ -14,6 +14,7 @@ import {
 import { API_ENDPOINTS } from "./config/api";
 import { T } from "../styles/varaTheme";
 import { KeyboardSafeScrollView } from "../components/KeyboardSafeScrollView";
+import { getToken } from "@/utils/tokenStore";
 
 type PasswordStrength = "empty" | "weak" | "medium" | "strong";
 
@@ -103,7 +104,7 @@ export default function SetPasswordScreen() {
     }
     setSaving(true);
     try {
-      const token = await AsyncStorage.getItem("token");
+      const token = await getToken();
       const res = await fetch(API_ENDPOINTS.SET_PASSWORD, {
         method: "PUT",
         headers: {

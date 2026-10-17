@@ -56,7 +56,9 @@
     "accept": "Accept",
     "decline": "Decline",
     "comments": "Comments",
-    "unsavedChanges": "You have unsaved changes"
+    "unsavedChanges": "You have unsaved changes",
+    "sessionExpired": "Your session has expired. Please sign in again.",
+    "requestTimeout": "The request took too long. Check your connection and try again."
   },
   "auth": {
     "login": "Login",
@@ -908,8 +910,6 @@
     "distanceFromAccommodation": "📏 Distance from accommodation",
     "venueSelected": "Selected",
     "shareFailed": "Unable to share plan.",
-    "numberOfVenues": "Number of options offered per category",
-    "minVenues": "min. {{count}} options",
     "destination": "Destination",
     "fetchingPlacesFrom": "Fetching real places from {{destination}}...",
     "destinationPlaceholder": "City or place (e.g. Split)",

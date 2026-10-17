@@ -1,5 +1,4 @@
 // contexts/UserContext.tsx
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, {
   createContext,
   useCallback,
@@ -8,6 +7,7 @@ import React, {
   useState,
 } from "react";
 import { API_BASE_URL } from "../config/api";
+import { getToken } from "@/utils/tokenStore";
 
 interface UserProfile {
   id: number;
@@ -37,7 +37,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   const loadProfile = useCallback(async () => {
     try {
-      const token = await AsyncStorage.getItem("token");
+      const token = await getToken();
       if (!token) {
         setProfile(null);
         setLoading(false);

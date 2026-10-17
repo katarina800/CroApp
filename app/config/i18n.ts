@@ -8,6 +8,7 @@ import fr from "../locales/fr.json";
 import hr from "../locales/hr.json";
 import it from "../locales/it.json";
 import { API_BASE_URL } from "./api";
+import { getToken } from "@/utils/tokenStore";
 
 const LANGUAGE_KEY = "vara_language";
 
@@ -31,7 +32,7 @@ export const saveLanguage = async (lang: string) => {
   i18n.changeLanguage(lang);
 
   try {
-    const token = await AsyncStorage.getItem("token"); // provjeri da li je ovo stvarni ključ u tvom kodu!
+    const token = await getToken(); // provjeri da li je ovo stvarni ključ u tvom kodu!
     if (token) {
       await fetch(`${API_BASE_URL}/api/auth/language`, {
         method: "PUT",

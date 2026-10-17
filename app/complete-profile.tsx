@@ -1,5 +1,4 @@
 // app/complete-profile.tsx
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { router } from "expo-router";
 import { useState } from "react";
@@ -14,6 +13,7 @@ import {
 } from "react-native";
 import { API_ENDPOINTS } from "./config/api";
 import { T } from "../styles/varaTheme";
+import { getToken } from "@/utils/tokenStore";
 
 export default function CompleteProfileScreen() {
   const [birthDate, setBirthDate] = useState<Date | null>(null);
@@ -27,7 +27,7 @@ export default function CompleteProfileScreen() {
     }
     setSaving(true);
     try {
-      const token = await AsyncStorage.getItem("token");
+      const token = await getToken();
       const res = await fetch(API_ENDPOINTS.COMPLETE_PROFILE, {
         method: "PUT",
         headers: {

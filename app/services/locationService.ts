@@ -1084,7 +1084,10 @@ function createLimiter(maxConcurrent: number, minGapMs: number) {
     pump();
   };
 
-  return function schedule<T>(task: () => Promise<T>, priority = false): Promise<T> {
+  return function schedule<T>(
+    task: () => Promise<T>,
+    priority = false,
+  ): Promise<T> {
     return new Promise<T>((resolve, reject) => {
       const job: QueueJob = { run: task, resolve, reject };
       if (priority) queue.unshift(job);
@@ -1098,7 +1101,10 @@ const overpassLimit = createLimiter(2, 350);
 const nominatimLimit = createLimiter(1, 1100);
 
 /** GET na Nominatim kroz red. null = nije uspjelo (mreža, 429, loš odgovor). */
-async function nominatimGet(url: string, priority = false): Promise<any[] | null> {
+async function nominatimGet(
+  url: string,
+  priority = false,
+): Promise<any[] | null> {
   try {
     const res = await nominatimLimit(async () => {
       const ctrl = new AbortController();
@@ -1713,7 +1719,12 @@ export const getPlacesInRadius = (
 ): Promise<Place[]> => {
   if (!types || types.length === 0) return Promise.resolve([]);
 
-  const key = placesKey(latitude, longitude, Math.round(radiusKm * 1000), types);
+  const key = placesKey(
+    latitude,
+    longitude,
+    Math.round(radiusKm * 1000),
+    types,
+  );
   const running = inflightPlaces.get(key);
   if (running) return running;
 

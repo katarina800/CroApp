@@ -214,7 +214,9 @@ export const LEGACY_ICONS: Partial<Record<IconKey, ImageSourcePropType>> = {
  * Tip tvrdi da postoje sve; jedina iznimka je "other" u starom načinu (nikad nije imao ikonu), pa je
  * tamo undefined — pozivatelji koji crtaju "other" već imaju rezervni emoji (`icon ? <Image/> : <Text/>`).
  */
-export const APP_ICONS = (USE_LEGACY_ICONS ? LEGACY_ICONS : NEW_ICONS) as Record<IconKey, ImageSourcePropType>;
+export const APP_ICONS = (
+  USE_LEGACY_ICONS ? LEGACY_ICONS : NEW_ICONS
+) as Record<IconKey, ImageSourcePropType>;
 
 /** Ikona po ključu, ili undefined (tada pozivatelj crta svoj rezervni emoji). */
 export function getIcon(key: string): ImageSourcePropType | undefined {

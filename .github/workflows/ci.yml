@@ -5,7 +5,7 @@
 # enclosing tag" dolazila je do Metro bundlera na računalu, umjesto da
 # padne ovdje.
 #
-# Sve tri provjere prolaze u trenutku kad je ovaj workflow dodan — ako
+# Sve četiri provjere prolaze u trenutku kad je ovaj workflow dodan — ako
 # nešto pocrveni, pocrvenjelo je zbog promjene, ne zbog naslijeđenog duga.
 name: CI
 
@@ -48,3 +48,9 @@ jobs:
 
       - name: Format
         run: npm run format:check
+
+      # Testovi kritičnih tokova: prijavni token (SecureStore + selidba),
+      # apiFetch (timeout, istekla prijava), provjera isteka tokena i
+      # usklađenost prijevoda.
+      - name: Test
+        run: npm test -- --ci

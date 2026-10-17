@@ -56,7 +56,9 @@
     "accept": "Annehmen",
     "decline": "Ablehnen",
     "comments": "Kommentare",
-    "unsavedChanges": "Du hast nicht gespeicherte Änderungen"
+    "unsavedChanges": "Du hast nicht gespeicherte Änderungen",
+    "sessionExpired": "Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.",
+    "requestTimeout": "Die Anfrage hat zu lange gedauert. Prüfe deine Verbindung und versuche es erneut."
   },
   "auth": {
     "login": "Anmeldung",
@@ -883,8 +885,6 @@
     "distanceFromAccommodation": "📏 Entfernung von der Unterkunft",
     "venueSelected": "Ausgewählt",
     "shareFailed": "Plan konnte nicht geteilt werden.",
-    "numberOfVenues": "Anzahl der angebotenen Optionen pro Kategorie",
-    "minVenues": "min. {{count}} Optionen",
     "fetchingPlacesFrom": "Lade echte Orte aus {{destination}}...",
     "destinationPlaceholder": "Stadt oder Ort (z.B. Split)",
     "postalCode": "Postleitzahl",

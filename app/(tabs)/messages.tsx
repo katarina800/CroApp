@@ -36,6 +36,7 @@ import { useTheme } from "../../components/AdaptiveThemeProvider";
 import { Conversation, getConversations } from "../../utils/messagesApi";
 import { useInputBottomOffset } from "@/hooks/use-keyboard-offset";
 import { T } from "../../styles/varaTheme";
+import { getToken } from "@/utils/tokenStore";
 
 const PRESET_AVATARS_MSG: Record<string, any> = {
   "avatar:male": require("../../assets/images/avatar-male.png"),
@@ -260,7 +261,7 @@ function StoryViewer({
     let cancelled = false;
     const fetchAvatar = async () => {
       try {
-        const token = await AsyncStorage.getItem("token");
+        const token = await getToken();
         const res = await fetch(
           `${API_BASE_URL}/api/auth/users/${story.userId}`,
           { headers: { Authorization: `Bearer ${token}` } },
@@ -345,7 +346,7 @@ function StoryViewer({
 
   useEffect(() => {
     const markAsViewed = async () => {
-      const token = await AsyncStorage.getItem("token");
+      const token = await getToken();
       console.log("markAsViewed called, token exists:", !!token);
       if (!token) return;
       try {
@@ -417,7 +418,7 @@ function StoryViewer({
     pauseProgress();
     setLoadingViewers(true);
     try {
-      const token = await AsyncStorage.getItem("token");
+      const token = await getToken();
       const res = await fetch(
         `${API_BASE_URL}/api/story/mark-viewed/${story.id}`,
         {
@@ -437,7 +438,7 @@ function StoryViewer({
   };
 
   const handleLike = async (reactionType: string = "like") => {
-    const token = await AsyncStorage.getItem("token");
+    const token = await getToken();
     if (!token) return;
     const wasLiked = liked;
     setLiked(!wasLiked);
@@ -467,7 +468,7 @@ function StoryViewer({
 
   const handleAddComment = async () => {
     if (!commentText.trim()) return;
-    const token = await AsyncStorage.getItem("token");
+    const token = await getToken();
     if (!token) return;
     try {
       const res = await fetch(`${API_BASE_URL}/api/story/comment/${story.id}`, {
@@ -492,7 +493,7 @@ function StoryViewer({
     commentId: number,
     reactionType: string,
   ) => {
-    const token = await AsyncStorage.getItem("token");
+    const token = await getToken();
     if (!token) return;
     try {
       await fetch(`${API_BASE_URL}/api/story/comment/react/${commentId}`, {
@@ -1332,7 +1333,7 @@ function StoriesRow({
 
   const loadStories = useCallback(async () => {
     try {
-      const token = await AsyncStorage.getItem("token");
+      const token = await getToken();
       const res = await fetch(`${API_BASE_URL}/api/story`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -1355,7 +1356,7 @@ function StoriesRow({
     if (!currentUserId) return;
     const fetchMyAvatar = async () => {
       try {
-        const token = await AsyncStorage.getItem("token");
+        const token = await getToken();
         const res = await fetch(
           `${API_BASE_URL}/api/auth/users/${currentUserId}`,
           { headers: { Authorization: `Bearer ${token}` } },
@@ -1379,7 +1380,7 @@ function StoriesRow({
 
   const handleDelete = async (id: number) => {
     try {
-      const token = await AsyncStorage.getItem("token");
+      const token = await getToken();
       await fetch(`${API_BASE_URL}/api/story/${id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
@@ -1663,7 +1664,7 @@ function AddStoryModal({
     if (!preview) return;
     setUploading(true);
     try {
-      const token = await AsyncStorage.getItem("token");
+      const token = await getToken();
       const formData = new FormData();
       formData.append("file", {
         uri: preview.uri,
@@ -2037,7 +2038,7 @@ function ConversationItem({
   useEffect(() => {
     const loadAvatar = async () => {
       try {
-        const token = await AsyncStorage.getItem("token");
+        const token = await getToken();
         const res = await fetch(
           `${API_BASE_URL}/api/auth/users/${item.userId}`,
           { headers: { Authorization: `Bearer ${token}` } },

@@ -16,15 +16,10 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { setSentryUser } from "../app/config/sentry";
+import { clearToken, getToken } from "./tokenStore";
 
-/** Ključevi koje prijava upisuje i koje odjava mora počistiti. */
-const AUTH_KEYS = [
-  "token",
-  "userId",
-  "firstName",
-  "lastName",
-  "username",
-] as const;
+/** Ključevi (osim tokena) koje prijava upisuje i koje odjava mora počistiti. */
+const AUTH_KEYS = ["userId", "firstName", "lastName", "username"] as const;
 
 /**
  * Sekunde do isteka iz "exp" tvrdnje tokena, ili null kad se ne da
@@ -70,7 +65,7 @@ export function isTokenExpired(token: string | null | undefined): boolean {
 /** Token ako je još valjan, inače null. */
 export async function getValidToken(): Promise<string | null> {
   try {
-    const token = await AsyncStorage.getItem("token");
+    const token = await getToken();
     return isTokenExpired(token) ? null : token;
   } catch {
     return null;
@@ -79,6 +74,8 @@ export async function getValidToken(): Promise<string | null> {
 
 /** Obriši prijavu. Ostalo (jezik, tema, spremljeni izbori) se ne dira. */
 export async function clearSession(): Promise<void> {
+  // Token je u SecureStore-u (vidi utils/tokenStore), ostalo u AsyncStorage-u.
+  await clearToken();
   try {
     await AsyncStorage.multiRemove([...AUTH_KEYS]);
   } catch {}

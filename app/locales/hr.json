@@ -56,7 +56,9 @@
     "accept": "Prihvati",
     "decline": "Odbij",
     "comments": "Komentari",
-    "unsavedChanges": "Imaš nespremljene promjene"
+    "unsavedChanges": "Imaš nespremljene promjene",
+    "sessionExpired": "Sesija je istekla. Prijavi se ponovno.",
+    "requestTimeout": "Zahtjev je predugo trajao. Provjeri vezu i pokušaj ponovno."
   },
   "auth": {
     "login": "Prijava",

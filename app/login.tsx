@@ -25,6 +25,8 @@ import * as Linking from "expo-linking";
 import { API_BASE_URL } from "./config/api";
 import { T } from "../styles/varaTheme";
 import { KeyboardSafeScrollView } from "../components/KeyboardSafeScrollView";
+import { setToken } from "@/utils/tokenStore";
+import { apiFetch, describeNetworkError } from "@/utils/apiFetch";
 
 // ─── Stiliziran VARA natpis ───────────────────────────────────────────────────
 function VaraWordmark() {
@@ -132,8 +134,9 @@ export default function LoginScreen() {
     }
     setIsLoading(true);
     try {
-      const response = await fetch(API_ENDPOINTS.LOGIN, {
+      const response = await apiFetch(API_ENDPOINTS.LOGIN, {
         method: "POST",
+        auth: false,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username: username.trim(), password }),
       });
@@ -143,7 +146,7 @@ export default function LoginScreen() {
       // završavao u catch-u kao "Provjeri internetsku vezu", iako je veza bila u redu.
       const data = await response.json().catch(() => null);
       if (response.ok && data) {
-        await AsyncStorage.setItem("token", data.token);
+        await setToken(data.token);
         await AsyncStorage.setItem("userId", data.userId.toString());
         // Da se u prijavama padova vidi pogađa li greška jednog korisnika
         // ili sve. Šalje se samo id — ni ime ni e-pošta.
@@ -179,8 +182,8 @@ export default function LoginScreen() {
       } else {
         Alert.alert(t("common.error"), t("validation.invalidCredentials"));
       }
-    } catch {
-      Alert.alert(t("common.error"), t("common.networkError"));
+    } catch (err) {
+      Alert.alert(t("common.error"), describeNetworkError(err, t));
     } finally {
       setIsLoading(false);
     }

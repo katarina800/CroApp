@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { API_BASE_URL } from "../app/config/api";
 import i18n from "../app/config/i18n";
+import { getToken } from "@/utils/tokenStore";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -28,9 +29,6 @@ export interface Conversation {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const getToken = async (): Promise<string | null> =>
-  AsyncStorage.getItem("token");
-
 // Poruke sa slikom/videom se šalju kao poseban tekstualni marker + JSON
 // (npr. "__CROMAP_IMAGE__{"url":"..."}") koji chat ekran prepoznaje i
 // prikazuje kao pravu sliku/video. Popis razgovora prije nije znao za taj
@@ -56,7 +54,7 @@ export const getCurrentUserId = async (): Promise<number | null> => {
   if (stored && stored !== "0") return parseInt(stored, 10);
 
   // Fallback: parse from JWT
-  const token = await AsyncStorage.getItem("token");
+  const token = await getToken();
   if (!token) return null;
   try {
     const payload = JSON.parse(atob(token.split(".")[1]));

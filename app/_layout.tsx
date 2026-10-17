@@ -1,21 +1,23 @@
 // app/_layout.tsx
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Linking from "expo-linking";
 import { Stack, router } from "expo-router";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, AppState, Text, View } from "react-native";
+import { ActivityIndicator, Alert, AppState, Text, View } from "react-native";
 import { AdaptiveThemeProvider } from "../components/AdaptiveThemeProvider"; // ← NOVO
 import FollowRequestNotifier from "../components/FollowRequestNotifier";
 import { API_BASE_URL } from "./config/api";
 import "./config/i18n"; // ← dodaj ovo kao prvi import
 import * as Sentry from "@sentry/react-native";
 import { initSentry, sentryEnabled } from "./config/sentry";
+import { installApiGuard, setUnauthorizedHandler } from "../utils/apiFetch";
 import { clearSession, isTokenExpired } from "../utils/session";
+import i18n from "./config/i18n";
 import { UserProvider } from "./contexts/UserContext";
+import { getToken } from "@/utils/tokenStore";
 
 const trackSessionTime = async (minutes: number) => {
   try {
-    const token = await AsyncStorage.getItem("token");
+    const token = await getToken();
     if (!token) return;
     await fetch(`${API_BASE_URL}/api/activity/track/session`, {
       method: "POST",
@@ -31,6 +33,15 @@ const trackSessionTime = async (minutes: number) => {
 // Mora se pozvati prije nego se išta iscrta, da se uhvati i pad pri
 // samom pokretanju — a ne tek onaj koji se dogodi nakon prvog rendera.
 initSentry();
+
+// Svi pozivi prema našem poslužitelju dobivaju timeout (20 s) i jedinstvenu
+// obradu istekle prijave — vidi utils/apiFetch.
+installApiGuard(API_BASE_URL);
+setUnauthorizedHandler(async () => {
+  await clearSession();
+  router.replace("/login");
+  Alert.alert(i18n.t("common.error"), i18n.t("common.sessionExpired"));
+});
 
 function RootLayout() {
   const [ready, setReady] = useState(false);
@@ -105,7 +116,7 @@ function RootLayout() {
 
   const checkAuth = async () => {
     try {
-      const token = await AsyncStorage.getItem("token");
+      const token = await getToken();
 
       // Prije se gledalo samo POSTOJI li token. Token vrijedi 7 dana, pa je
       // osmog dana korisnik ulazio u aplikaciju u kojoj svaki zahtjev vraća

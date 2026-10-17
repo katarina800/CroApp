@@ -9,6 +9,7 @@ import { API_ENDPOINTS } from "../config/api";
 import i18n, { languageReady } from "../config/i18n";
 import { clearSession, isTokenExpired } from "../../utils/session";
 import { TutorialModal, hasSeenTutorial } from "../../components/TutorialModal";
+import { getToken } from "@/utils/tokenStore";
 
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
@@ -25,7 +26,7 @@ export default function TabsLayout() {
   // su podaci nestali: nula pratitelja, nema poruka, nema videa. Umjesto
   // toga korisnika se pošalje na prijavu i kaže mu se zašto.
   const checkSession = useCallback(async () => {
-    const token = await AsyncStorage.getItem("token");
+    const token = await getToken();
     if (!token) return;
 
     let revoked = false;

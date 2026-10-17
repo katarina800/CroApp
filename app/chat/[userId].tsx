@@ -1,5 +1,4 @@
 import { Ionicons } from "@expo/vector-icons";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams } from "expo-router";
 import { VideoView, useVideoPlayer } from "expo-video";
@@ -41,6 +40,7 @@ import { useActivePolling } from "@/hooks/use-active-polling";
 import { useKeyboardOverlap } from "@/hooks/use-keyboard-offset";
 import { CloseButton } from "@/components/CloseButton";
 import { T } from "../../styles/varaTheme";
+import { getToken } from "@/utils/tokenStore";
 
 // ─── VARA Paleta ───────────────────────────────────────────────────────────────
 function getV(isDark: boolean) {
@@ -561,7 +561,7 @@ export default function ChatScreen() {
   useEffect(() => {
     const fetchUserInfo = async () => {
       try {
-        const token = await AsyncStorage.getItem("token");
+        const token = await getToken();
         const res = await fetch(
           `${API_BASE_URL}/api/auth/users/${otherUserId}`,
           { headers: { Authorization: `Bearer ${token}` } },
@@ -640,7 +640,7 @@ export default function ChatScreen() {
     if (!mediaPreview) return;
     setSendingMedia(true);
     try {
-      const token = await AsyncStorage.getItem("token");
+      const token = await getToken();
       if (!token) {
         Alert.alert(t("common.error"), t("auth.notSignedIn"));
         return;

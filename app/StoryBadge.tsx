@@ -2,11 +2,11 @@
 // FIX: Koristi ispravan endpoint /api/story/has-story/{userId}
 // koji provjerava ima li korisnik BILO KOJI aktivan story (neovisno o tome tko gleda)
 
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useEffect, useRef, useState } from "react";
 import { Animated, StyleSheet, View } from "react-native";
 import { API_BASE_URL } from "./config/api";
 import { useActivePolling } from "@/hooks/use-active-polling";
+import { getToken } from "@/utils/tokenStore";
 
 interface StoryBadgeProps {
   userId: number;
@@ -57,7 +57,7 @@ export function StoryBadge({ userId, size = 56, children }: StoryBadgeProps) {
 
   const checkHasStory = async () => {
     try {
-      const token = await AsyncStorage.getItem("token");
+      const token = await getToken();
       if (!token) return;
 
       // Endpoint koji provjerava ima li korisnik (userId) aktivnih storija

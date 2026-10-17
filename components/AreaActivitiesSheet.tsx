@@ -38,6 +38,7 @@ import { APP_ICONS, getIcon } from "../constants/icons";
 import { CloseButton } from "./CloseButton";
 import { MediaPager, PagerItem } from "./MediaPager";
 import { T } from "../styles/varaTheme";
+import { getToken } from "@/utils/tokenStore";
 
 /** Mjesto oko kojeg se traži. */
 export interface AreaPoint {
@@ -397,7 +398,7 @@ export function AreaActivitiesSheet({
     setLoading(true);
     setFailed(false);
     try {
-      const token = await AsyncStorage.getItem("token");
+      const token = await getToken();
       const res = await fetch(
         `${API_BASE_URL}/api/video?page=1&pageSize=50` +
           `&radiusKm=${radiusKm}&lat=${point.latitude}&lon=${point.longitude}`,

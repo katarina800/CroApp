@@ -16,6 +16,7 @@ import {
 import { API_ENDPOINTS } from "./config/api";
 import { KeyboardSafeScrollView } from "../components/KeyboardSafeScrollView";
 import { T } from "../styles/varaTheme";
+import { apiFetch, describeNetworkError } from "@/utils/apiFetch";
 
 type Step = "email" | "code" | "newPassword";
 
@@ -53,8 +54,9 @@ export default function ForgotPasswordScreen() {
     }
     setIsLoading(true);
     try {
-      const response = await fetch(API_ENDPOINTS.FORGOT_PASSWORD, {
+      const response = await apiFetch(API_ENDPOINTS.FORGOT_PASSWORD, {
         method: "POST",
+        auth: false,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: contact.trim() }),
       });
@@ -78,8 +80,8 @@ export default function ForgotPasswordScreen() {
       } else {
         Alert.alert(t("common.error"), t("forgotPassword.tryAgain"));
       }
-    } catch {
-      Alert.alert(t("common.error"), t("common.networkError"));
+    } catch (err) {
+      Alert.alert(t("common.error"), describeNetworkError(err, t));
     } finally {
       setIsLoading(false);
     }
@@ -91,8 +93,9 @@ export default function ForgotPasswordScreen() {
     if (secondsLeft > 0 || isLoading) return;
     setIsLoading(true);
     try {
-      const response = await fetch(API_ENDPOINTS.FORGOT_PASSWORD, {
+      const response = await apiFetch(API_ENDPOINTS.FORGOT_PASSWORD, {
         method: "POST",
+        auth: false,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: (email || contact).trim() }),
       });
@@ -110,8 +113,8 @@ export default function ForgotPasswordScreen() {
       } else {
         Alert.alert(t("common.error"), t("forgotPassword.tryAgain"));
       }
-    } catch {
-      Alert.alert(t("common.error"), t("common.networkError"));
+    } catch (err) {
+      Alert.alert(t("common.error"), describeNetworkError(err, t));
     } finally {
       setIsLoading(false);
     }
@@ -128,8 +131,9 @@ export default function ForgotPasswordScreen() {
     }
     setIsLoading(true);
     try {
-      const response = await fetch(API_ENDPOINTS.VERIFY_RESET_CODE, {
+      const response = await apiFetch(API_ENDPOINTS.VERIFY_RESET_CODE, {
         method: "POST",
+        auth: false,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email: (email || contact).trim(),
@@ -149,8 +153,8 @@ export default function ForgotPasswordScreen() {
       } else {
         Alert.alert(t("common.error"), t("forgotPassword.invalidCode"));
       }
-    } catch {
-      Alert.alert(t("common.error"), t("common.networkError"));
+    } catch (err) {
+      Alert.alert(t("common.error"), describeNetworkError(err, t));
     } finally {
       setIsLoading(false);
     }
@@ -167,8 +171,9 @@ export default function ForgotPasswordScreen() {
     }
     setIsLoading(true);
     try {
-      const response = await fetch(API_ENDPOINTS.RESET_PASSWORD, {
+      const response = await apiFetch(API_ENDPOINTS.RESET_PASSWORD, {
         method: "POST",
+        auth: false,
         headers: { "Content-Type": "application/json" },
         // Umjesto šest znamenki šalje se dozvola koju je poslužitelj izdao
         // nakon što je kod provjerio; veže se uz e-mail baš tog računa.
@@ -196,8 +201,8 @@ export default function ForgotPasswordScreen() {
         setStep("email");
         Alert.alert(t("common.error"), t("forgotPassword.invalidCode"));
       }
-    } catch {
-      Alert.alert(t("common.error"), t("common.networkError"));
+    } catch (err) {
+      Alert.alert(t("common.error"), describeNetworkError(err, t));
     } finally {
       setIsLoading(false);
     }

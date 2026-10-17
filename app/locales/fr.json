@@ -56,7 +56,9 @@
     "accept": "Accepter",
     "decline": "Refuser",
     "comments": "Commentaires",
-    "unsavedChanges": "Tu as des modifications non enregistrées"
+    "unsavedChanges": "Tu as des modifications non enregistrées",
+    "sessionExpired": "Ta session a expiré. Reconnecte-toi.",
+    "requestTimeout": "La requête a pris trop de temps. Vérifie ta connexion et réessaie."
   },
   "auth": {
     "login": "Connexion",
@@ -384,7 +386,6 @@
   },
   "videos": {
     "title": "Vidéos",
-    "members": "membres",
     "savedToBoxTitle": "Enregistré dans le Coffre",
     "savedToBoxDesc": "Vous pouvez revoir cette vidéo dans votre profil, dans la section Coffre.",
     "addedToWishlistTitle": "Ajouté à la liste de souhaits",
@@ -934,8 +935,6 @@
     "distanceFromAccommodation": "📏 Distance de l'hébergement",
     "venueSelected": "Sélectionné",
     "shareFailed": "Impossible de partager le plan.",
-    "numberOfVenues": "Nombre d'options proposées par catégorie",
-    "minVenues": "min. {{count}} options",
     "fetchingPlacesFrom": "Récupération des vrais lieux depuis {{destination}}...",
     "destinationPlaceholder": "Ville ou lieu (ex: Split)",
     "postalCode": "Code postal",

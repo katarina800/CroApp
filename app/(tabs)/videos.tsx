@@ -91,6 +91,7 @@ const AGE_GROUP_IDS = [
 // Sada dolazi iz sustava boja, pa se ispravci vide i ovdje.
 import { T, V } from "../../styles/varaTheme";
 import { StateView } from "../../components/StateView";
+import { getToken } from "@/utils/tokenStore";
 
 function getVT(dark: boolean) {
   return {
@@ -275,7 +276,7 @@ async function fetchUserProfile(
 
   const request = (async (): Promise<FetchedProfile | null> => {
     try {
-      const token = await AsyncStorage.getItem("token");
+      const token = await getToken();
       if (!token) return null;
 
       const res = await fetch(`${API_BASE_URL}/api/auth/users/${userId}`, {
@@ -886,7 +887,7 @@ function CommentsModal({
 
   const loadComments = async () => {
     if (!video) return;
-    const token = await AsyncStorage.getItem("token");
+    const token = await getToken();
     setLoading(true);
     try {
       const res = await fetch(`${API_BASE_URL}/api/comment/video/${video.id}`, {
@@ -902,7 +903,7 @@ function CommentsModal({
 
   const addComment = async () => {
     if (!video || !newComment.trim()) return;
-    const token = await AsyncStorage.getItem("token");
+    const token = await getToken();
     setSubmitting(true);
     try {
       const res = await fetch(`${API_BASE_URL}/api/comment`, {
@@ -1079,7 +1080,7 @@ function MessengerModal({
 
   const sendMessage = async () => {
     if (!video || !message.trim()) return;
-    const token = await AsyncStorage.getItem("token");
+    const token = await getToken();
     setSending(true);
     try {
       const res = await fetch(`${API_BASE_URL}/api/message/send`, {
@@ -1230,7 +1231,7 @@ function ShareModal({
   const [search, setSearch] = useState("");
 
   const loadUsers = async () => {
-    const token = await AsyncStorage.getItem("token");
+    const token = await getToken();
     setLoading(true);
     try {
       const res = await fetch(`${API_BASE_URL}/api/auth/users`, {
@@ -1255,7 +1256,7 @@ function ShareModal({
           text: "Da",
           onPress: async () => {
             if (!video) return;
-            const token = await AsyncStorage.getItem("token");
+            const token = await getToken();
             setSending(receiverId);
             try {
               const VIDEO_PREFIX = "__CROMAP_VIDEO__";
@@ -1550,7 +1551,7 @@ export function UploadModal({
     locationDebounceRef.current = setTimeout(async () => {
       setSearchingLocation(true);
       try {
-        const token = await AsyncStorage.getItem("token");
+        const token = await getToken();
         const res = await fetch(
           `${API_BASE_URL}/api/locationsearch/autocomplete?query=${encodeURIComponent(query.trim())}`,
           token ? { headers: { Authorization: `Bearer ${token}` } } : undefined,
@@ -1609,7 +1610,7 @@ export function UploadModal({
   };
 
   const uploadMedia = async () => {
-    const token = await AsyncStorage.getItem("token");
+    const token = await getToken();
     let userId = await AsyncStorage.getItem("userId");
     if (!userId || userId === "0") {
       try {
@@ -2466,7 +2467,7 @@ export default function VideosScreen() {
   // vraćao SVE videe u bazi u jednom odgovoru, što je bilo sve sporije
   // (i teže za memoriju) kako je raslo videa.
   const loadVideos = async (pageToLoad = 1) => {
-    const token = await AsyncStorage.getItem("token");
+    const token = await getToken();
     if (!token) return;
     if (pageToLoad === 1) setLoading(true);
     else setLoadingMore(true);
@@ -2575,7 +2576,7 @@ export default function VideosScreen() {
         const position = await Location.getLastKnownPositionAsync();
         if (!position) return;
 
-        const token = await AsyncStorage.getItem("token");
+        const token = await getToken();
         if (!token) return;
 
         await fetch(`${API_BASE_URL}/api/video/area-ping`, {
@@ -2594,7 +2595,7 @@ export default function VideosScreen() {
   }, []);
 
   const handleLikeToggle = async (videoId: number) => {
-    const token = await AsyncStorage.getItem("token");
+    const token = await getToken();
     setVideos((prev) =>
       prev.map((v) =>
         v.id === videoId
@@ -2640,7 +2641,7 @@ export default function VideosScreen() {
   };
 
   const handleSaveToggle = async (videoId: number) => {
-    const token = await AsyncStorage.getItem("token");
+    const token = await getToken();
     const video = videos.find((v) => v.id === videoId);
     if (!video) return;
     setVideos((prev) =>
@@ -2676,7 +2677,7 @@ export default function VideosScreen() {
   };
 
   const handleWishlistToggle = async (videoId: number) => {
-    const token = await AsyncStorage.getItem("token");
+    const token = await getToken();
     const video = videos.find((v) => v.id === videoId);
     if (!video) return;
     setVideos((prev) =>
@@ -2746,7 +2747,7 @@ export default function VideosScreen() {
         text: t("common.delete"),
         style: "destructive",
         onPress: async () => {
-          const token = await AsyncStorage.getItem("token");
+          const token = await getToken();
           try {
             const res = await fetch(`${API_BASE_URL}/api/video/${videoId}`, {
               method: "DELETE",

@@ -1,10 +1,10 @@
 // components/UserAvatar.tsx
 // Reusable avatar: slika → muški avatar → ženski avatar → inicijali
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useEffect, useRef, useState } from "react";
 import { Image, StyleSheet, Text, View } from "react-native";
 import Svg, { Defs, LinearGradient, Path, Stop } from "react-native-svg";
 import { API_BASE_URL } from "../app/config/api";
+import { getToken } from "@/utils/tokenStore";
 const AVATAR_MALE = require("../assets/images/avatar-male.png");
 const AVATAR_FEMALE = require("../assets/images/avatar-female.png");
 
@@ -145,7 +145,7 @@ export default function UserAvatar({
     if (userId) {
       (async () => {
         try {
-          const token = await AsyncStorage.getItem("token");
+          const token = await getToken();
           if (!token) return;
           const res = await fetch(`${API_BASE_URL}/api/auth/users/${userId}`, {
             headers: { Authorization: `Bearer ${token}` },

@@ -25,6 +25,7 @@ import * as Linking from "expo-linking";
 import { API_BASE_URL } from "./config/api";
 import { T } from "../styles/varaTheme";
 import { KeyboardSafeScrollView } from "../components/KeyboardSafeScrollView";
+import { apiFetch, describeNetworkError } from "@/utils/apiFetch";
 
 type PasswordStrength = "empty" | "weak" | "medium" | "strong";
 
@@ -203,8 +204,9 @@ export default function RegisterScreen() {
         email: form.email.trim() || null,
         language: i18n.language,
       };
-      const response = await fetch(API_ENDPOINTS.REGISTER, {
+      const response = await apiFetch(API_ENDPOINTS.REGISTER, {
         method: "POST",
+        auth: false,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(dataToSend),
       });
@@ -244,8 +246,8 @@ export default function RegisterScreen() {
           Alert.alert(t("common.error"), t("validation.registerFailed"));
         }
       }
-    } catch {
-      Alert.alert(t("common.error"), t("common.networkError"));
+    } catch (err) {
+      Alert.alert(t("common.error"), describeNetworkError(err, t));
     } finally {
       setIsLoading(false);
     }
