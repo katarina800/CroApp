@@ -82,7 +82,11 @@ export type IconKey =
   | "styleAdventure"
   // kontrole karte (nova ikona, stare nema)
   | "mapLocate"
-  | "mapActivities";
+  | "mapActivities"
+  // prijava i oporavak lozinke
+  | "authMail"
+  | "authKey"
+  | "authLock";
 
 export const NEW_ICONS: Record<IconKey, ImageSourcePropType> = {
   jutro: require("../assets/images/icons/time-morning.png"),
@@ -145,6 +149,9 @@ export const NEW_ICONS: Record<IconKey, ImageSourcePropType> = {
   styleAdventure: require("../assets/images/icons/style-adventure.png"),
   mapLocate: require("../assets/images/icons/map-locate.png"),
   mapActivities: require("../assets/images/icons/map-activities.png"),
+  authMail: require("../assets/images/icons/auth-mail.png"),
+  authKey: require("../assets/images/icons/auth-key.png"),
+  authLock: require("../assets/images/icons/auth-lock.png"),
 };
 
 /**

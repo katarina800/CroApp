@@ -9,6 +9,7 @@ import { useTranslation } from "react-i18next";
 import {
   ActivityIndicator,
   Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
   StatusBar,
@@ -22,6 +23,8 @@ import { API_ENDPOINTS } from "./config/api";
 import { T } from "../styles/varaTheme";
 import { KeyboardSafeScrollView } from "../components/KeyboardSafeScrollView";
 import { apiFetch, describeNetworkError } from "@/utils/apiFetch";
+import { A } from "../styles/authTheme";
+import { APP_ICONS } from "../constants/icons";
 
 /** Poslužitelj ne šalje novi kod češće od jednom u minuti. */
 const RESEND_SECONDS = 60;
@@ -118,13 +121,17 @@ export default function VerifyEmailScreen() {
       style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <StatusBar barStyle="light-content" backgroundColor="#0D2406" />
+      <StatusBar barStyle="light-content" backgroundColor={A.statusBar} />
       <KeyboardSafeScrollView
         contentContainerStyle={styles.scroll}
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.card}>
-          <Text style={styles.icon}>✉️</Text>
+          <Image
+            source={APP_ICONS.authMail}
+            style={styles.iconImg}
+            resizeMode="contain"
+          />
           <Text style={styles.title}>{t("verifyEmail.title")}</Text>
           <Text style={styles.subtitle}>
             {t("verifyEmail.subtitle", { email })}
@@ -137,7 +144,7 @@ export default function VerifyEmailScreen() {
               selectTextOnFocus
               style={[styles.input, styles.codeInput]}
               placeholder="123456"
-              placeholderTextColor="#9AA9A7"
+              placeholderTextColor={A.placeholder}
               value={code}
               onChangeText={(v) => setCode(v.replace(/\D/g, "").slice(0, 6))}
               keyboardType="number-pad"
@@ -151,7 +158,7 @@ export default function VerifyEmailScreen() {
               disabled={isLoading}
             >
               {isLoading ? (
-                <ActivityIndicator color="#fff" />
+                <ActivityIndicator color={A.onPrimary} />
               ) : (
                 <Text style={styles.buttonText}>
                   {t("verifyEmail.verifyBtn")}
@@ -190,13 +197,11 @@ export default function VerifyEmailScreen() {
 }
 
 // Ista paleta kao forgot-password.tsx / login.tsx.
-const GREEN_DEEPEST = "#0D2406";
-const GREEN_DARK = "#1B3F0E";
-const GREEN_MID = "#2D6418";
-const SILVER = "#9AA9A7";
-const SILVER_LIGHT = "#E8EEEE";
-const TEXT_DARK = "#142F09";
-const TEXT_MID = "#5C6765";
+const GREEN_DEEPEST = A.statusBar;
+const GREEN_DARK = A.bg;
+const VALID_GREEN = A.valid;
+const TEXT_DARK = A.text;
+const TEXT_MID = A.textDim;
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: GREEN_DARK },
@@ -208,7 +213,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   card: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: A.card,
+    borderWidth: 1,
+    borderColor: A.cardBorder,
     borderRadius: 24,
     padding: 28,
     width: "100%",
@@ -220,7 +227,7 @@ const styles = StyleSheet.create({
     shadowRadius: 24,
     elevation: 12,
   },
-  icon: { fontSize: 48, marginBottom: 14 },
+  iconImg: { width: 76, height: 76, marginBottom: 14 },
   title: {
     fontSize: T.screen,
     fontWeight: "800",
@@ -237,7 +244,7 @@ const styles = StyleSheet.create({
   },
   note: {
     fontSize: T.meta,
-    color: SILVER,
+    color: A.textDim,
     textAlign: "center",
     marginBottom: 24,
   },
@@ -250,13 +257,13 @@ const styles = StyleSheet.create({
     marginBottom: 7,
   },
   input: {
-    backgroundColor: SILVER_LIGHT,
+    backgroundColor: A.inputBg,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
     fontSize: T.lead,
     borderWidth: 1.5,
-    borderColor: "#D1DADB",
+    borderColor: A.divider,
     color: TEXT_DARK,
     marginBottom: 8,
   },
@@ -267,27 +274,31 @@ const styles = StyleSheet.create({
     letterSpacing: 12,
   },
   button: {
-    backgroundColor: GREEN_MID,
+    backgroundColor: A.primary,
     borderRadius: 14,
     paddingVertical: 16,
     marginTop: 12,
     alignItems: "center",
-    shadowColor: GREEN_DEEPEST,
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 10,
     elevation: 6,
   },
-  buttonDisabled: { backgroundColor: SILVER, shadowOpacity: 0, elevation: 0 },
+  buttonDisabled: {
+    backgroundColor: A.primaryDisabled,
+    shadowOpacity: 0,
+    elevation: 0,
+  },
   buttonText: {
-    color: "#FFFFFF",
+    color: A.onPrimary,
     fontSize: T.lead,
     fontWeight: "700",
     letterSpacing: 0.5,
   },
   resendBtn: { marginTop: 16, alignItems: "center" },
-  resendText: { color: GREEN_MID, fontSize: T.body, fontWeight: "600" },
-  resendTextDisabled: { color: SILVER },
+  resendText: { color: A.accent, fontSize: T.body, fontWeight: "600" },
+  resendTextDisabled: { color: A.textDim },
   backBtn: { marginTop: 28 },
   backText: { color: TEXT_MID, fontSize: T.body },
 });

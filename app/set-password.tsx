@@ -15,6 +15,8 @@ import { API_ENDPOINTS } from "./config/api";
 import { T } from "../styles/varaTheme";
 import { KeyboardSafeScrollView } from "../components/KeyboardSafeScrollView";
 import { getToken } from "@/utils/tokenStore";
+import { A } from "../styles/authTheme";
+import { Ionicons } from "@expo/vector-icons";
 
 type PasswordStrength = "empty" | "weak" | "medium" | "strong";
 
@@ -60,10 +62,10 @@ const STRENGTH_COLORS: Record<
   PasswordStrength,
   { color: string; barWidth: `${number}%` }
 > = {
-  empty: { color: "#D1DADB", barWidth: "0%" },
-  weak: { color: "#C0392B", barWidth: "33%" },
-  medium: { color: "#E29A1E", barWidth: "66%" },
-  strong: { color: "#4CAF50", barWidth: "100%" },
+  empty: { color: A.divider, barWidth: "0%" },
+  weak: { color: A.error, barWidth: "33%" },
+  medium: { color: A.warn, barWidth: "66%" },
+  strong: { color: A.valid, barWidth: "100%" },
 };
 
 const STORAGE_GENERATED_PASSWORD = "vara_generated_password_v1";
@@ -136,7 +138,7 @@ export default function SetPasswordScreen() {
 
   return (
     <KeyboardSafeScrollView
-      style={{ backgroundColor: "#1B3F0E" }}
+      style={{ backgroundColor: A.bg }}
       contentContainerStyle={s.root}
     >
       <Text style={s.title}>Postavi lozinku</Text>
@@ -150,7 +152,7 @@ export default function SetPasswordScreen() {
           selectTextOnFocus
           style={s.input}
           placeholder="Nova lozinka"
-          placeholderTextColor="#9AA9A7"
+          placeholderTextColor={A.placeholder}
           secureTextEntry={!showPassword}
           value={password}
           onChangeText={setPassword}
@@ -167,9 +169,11 @@ export default function SetPasswordScreen() {
           onPress={() => setShowPassword((v) => !v)}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <Text style={{ fontSize: T.title, opacity: showPassword ? 1 : 0.5 }}>
-            👁️
-          </Text>
+          <Ionicons
+            name={showPassword ? "eye" : "eye-off"}
+            size={22}
+            color={showPassword ? A.accent : A.textDim}
+          />
         </TouchableOpacity>
       </View>
 
@@ -180,10 +184,10 @@ export default function SetPasswordScreen() {
             fontSize: T.meta,
             color:
               password.length === 0
-                ? "rgba(255,255,255,0.65)"
+                ? A.textDim
                 : password.length < 6
-                  ? "#C0392B" // crveno
-                  : "#4CAF50", // zeleno
+                  ? A.error // crveno
+                  : A.valid, // zeleno
             marginBottom: 6,
           }}
         >
@@ -196,7 +200,7 @@ export default function SetPasswordScreen() {
               style={{
                 height: 4,
                 borderRadius: 2,
-                backgroundColor: "rgba(255,255,255,0.25)",
+                backgroundColor: A.divider,
                 overflow: "hidden",
               }}
             >
@@ -230,7 +234,7 @@ export default function SetPasswordScreen() {
             style={{
               fontSize: T.meta,
               fontWeight: "700",
-              color: "#8BC97B",
+              color: A.valid,
               textDecorationLine: "underline",
             }}
           >
@@ -244,7 +248,7 @@ export default function SetPasswordScreen() {
           selectTextOnFocus
           style={s.input}
           placeholder="Potvrdi lozinku"
-          placeholderTextColor="#9AA9A7"
+          placeholderTextColor={A.placeholder}
           secureTextEntry={!showConfirmPassword}
           value={confirmPassword}
           onChangeText={setConfirmPassword}
@@ -261,14 +265,11 @@ export default function SetPasswordScreen() {
           onPress={() => setShowConfirmPassword((v) => !v)}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <Text
-            style={{
-              fontSize: T.title,
-              opacity: showConfirmPassword ? 1 : 0.5,
-            }}
-          >
-            👁️
-          </Text>
+          <Ionicons
+            name={showConfirmPassword ? "eye" : "eye-off"}
+            size={22}
+            color={showConfirmPassword ? A.accent : A.textDim}
+          />
         </TouchableOpacity>
       </View>
 
@@ -278,7 +279,7 @@ export default function SetPasswordScreen() {
         disabled={saving}
       >
         {saving ? (
-          <ActivityIndicator color="#fff" />
+          <ActivityIndicator color={A.onPrimary} />
         ) : (
           <Text style={s.saveBtnText}>Spremi i nastavi</Text>
         )}
@@ -290,39 +291,41 @@ export default function SetPasswordScreen() {
 const s = StyleSheet.create({
   root: {
     flexGrow: 1,
-    backgroundColor: "#1B3F0E",
+    backgroundColor: A.bg,
     padding: 24,
     justifyContent: "center",
   },
   title: {
     fontSize: T.screen,
     fontWeight: "800",
-    color: "#fff",
+    color: A.text,
     marginBottom: 8,
     textAlign: "center",
   },
   subtitle: {
     fontSize: T.body,
-    color: "rgba(255,255,255,0.7)",
+    color: A.textDim,
     marginBottom: 28,
     textAlign: "center",
     lineHeight: 20,
   },
   input: {
-    backgroundColor: "#fff",
+    backgroundColor: A.inputBg,
+    borderWidth: 1.5,
+    borderColor: A.inputBorder,
     borderRadius: 12,
     paddingVertical: 14,
     paddingHorizontal: 16,
     fontSize: T.lead,
     marginBottom: 14,
-    color: "#142F09",
+    color: A.text,
   },
   saveBtn: {
-    backgroundColor: "#2D6418",
+    backgroundColor: A.primary,
     borderRadius: 14,
     paddingVertical: 16,
     alignItems: "center",
     marginTop: 8,
   },
-  saveBtnText: { color: "#fff", fontSize: T.lead, fontWeight: "700" },
+  saveBtnText: { color: A.onPrimary, fontSize: T.lead, fontWeight: "700" },
 });

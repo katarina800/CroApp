@@ -14,6 +14,7 @@ import {
 import { API_ENDPOINTS } from "./config/api";
 import { T } from "../styles/varaTheme";
 import { getToken } from "@/utils/tokenStore";
+import { A } from "../styles/authTheme";
 
 export default function CompleteProfileScreen() {
   const [birthDate, setBirthDate] = useState<Date | null>(null);
@@ -80,7 +81,7 @@ export default function CompleteProfileScreen() {
         disabled={saving}
       >
         {saving ? (
-          <ActivityIndicator color="#fff" />
+          <ActivityIndicator color={A.onPrimary} />
         ) : (
           <Text style={s.saveBtnText}>Spremi i nastavi</Text>
         )}
@@ -92,36 +93,38 @@ export default function CompleteProfileScreen() {
 const s = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: "#1B3F0E",
+    backgroundColor: A.bg,
     padding: 24,
     justifyContent: "center",
   },
   title: {
     fontSize: T.screen,
     fontWeight: "800",
-    color: "#fff",
+    color: A.text,
     marginBottom: 8,
     textAlign: "center",
   },
   subtitle: {
     fontSize: T.body,
-    color: "rgba(255,255,255,0.7)",
+    color: A.textDim,
     marginBottom: 32,
     textAlign: "center",
   },
   dateBtn: {
-    backgroundColor: "#fff",
+    backgroundColor: A.inputBg,
+    borderWidth: 1.5,
+    borderColor: A.inputBorder,
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: "center",
     marginBottom: 24,
   },
-  dateBtnText: { fontSize: T.lead, color: "#142F09", fontWeight: "600" },
+  dateBtnText: { fontSize: T.lead, color: A.text, fontWeight: "600" },
   saveBtn: {
-    backgroundColor: "#2D6418",
+    backgroundColor: A.primary,
     borderRadius: 14,
     paddingVertical: 16,
     alignItems: "center",
   },
-  saveBtnText: { color: "#fff", fontSize: T.lead, fontWeight: "700" },
+  saveBtnText: { color: A.onPrimary, fontSize: T.lead, fontWeight: "700" },
 });

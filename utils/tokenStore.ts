@@ -17,8 +17,21 @@
 // AsyncStorage kao rezerva — bolje slabije čuvana prijava nego nikakva.
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
+
+// expo-secure-store je nativni modul. Ako se novi JS pokrene na staroj
+// instalaciji (bez tog modula — npr. Metro na starom development buildu),
+// obični import bi srušio cijelu aplikaciju pri pokretanju. Zato se učitava
+// ovdje, u try/catch: bez modula token ostaje u AsyncStorage-u kao prije, a
+// sigurno spremište počne raditi čim se instalira novi build.
+type SecureStoreModule = typeof import("expo-secure-store");
+let SecureStore: SecureStoreModule | null = null;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  SecureStore = require("expo-secure-store") as SecureStoreModule;
+} catch {
+  SecureStore = null;
+}
 
 const KEY = "token";
 
@@ -28,14 +41,14 @@ const KEY = "token";
  */
 let cached: string | null | undefined;
 
-const secureAvailable = () => Platform.OS !== "web";
+const secureAvailable = () => Platform.OS !== "web" && SecureStore !== null;
 
 export async function getToken(): Promise<string | null> {
   if (cached !== undefined) return cached;
 
   if (secureAvailable()) {
     try {
-      const secure = await SecureStore.getItemAsync(KEY);
+      const secure = await SecureStore!.getItemAsync(KEY);
       if (secure) {
         cached = secure;
         return secure;
@@ -54,7 +67,7 @@ export async function getToken(): Promise<string | null> {
 
   if (legacy && secureAvailable()) {
     try {
-      await SecureStore.setItemAsync(KEY, legacy);
+      await SecureStore!.setItemAsync(KEY, legacy);
       await AsyncStorage.removeItem(KEY);
     } catch {
       // Selidba nije uspjela; token ostaje gdje je i radi, pokušat ćemo opet.
@@ -70,7 +83,7 @@ export async function setToken(token: string): Promise<void> {
 
   if (secureAvailable()) {
     try {
-      await SecureStore.setItemAsync(KEY, token);
+      await SecureStore!.setItemAsync(KEY, token);
       // Stara kopija ne smije ostati čitljiva.
       await AsyncStorage.removeItem(KEY).catch(() => {});
       return;
@@ -85,7 +98,7 @@ export async function clearToken(): Promise<void> {
   cached = null;
   if (secureAvailable()) {
     try {
-      await SecureStore.deleteItemAsync(KEY);
+      await SecureStore!.deleteItemAsync(KEY);
     } catch {
       // Nastavi: stara lokacija se svejedno briše.
     }

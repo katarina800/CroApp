@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import {
   ActivityIndicator,
   Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
   StatusBar,
@@ -17,6 +18,9 @@ import { API_ENDPOINTS } from "./config/api";
 import { KeyboardSafeScrollView } from "../components/KeyboardSafeScrollView";
 import { T } from "../styles/varaTheme";
 import { apiFetch, describeNetworkError } from "@/utils/apiFetch";
+import { A } from "../styles/authTheme";
+import { Ionicons } from "@expo/vector-icons";
+import { APP_ICONS } from "../constants/icons";
 
 type Step = "email" | "code" | "newPassword";
 
@@ -212,17 +216,17 @@ export default function ForgotPasswordScreen() {
     email: {
       title: t("forgotPassword.step1Title"),
       subtitle: t("forgotPassword.step1Desc"),
-      icon: "📧",
+      icon: APP_ICONS.authMail,
     },
     code: {
       title: t("forgotPassword.step2Title"),
       subtitle: t("forgotPassword.step2Desc", { email }),
-      icon: "🔢",
+      icon: APP_ICONS.authKey,
     },
     newPassword: {
       title: t("forgotPassword.step3Title"),
       subtitle: t("forgotPassword.step3Desc"),
-      icon: "🔐",
+      icon: APP_ICONS.authLock,
     },
   };
 
@@ -241,7 +245,7 @@ export default function ForgotPasswordScreen() {
       // koristi useInputBottomOffset iz hooks/use-keyboard-offset.)
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <StatusBar barStyle="light-content" backgroundColor="#0D2406" />
+      <StatusBar barStyle="light-content" backgroundColor={A.statusBar} />
       <KeyboardSafeScrollView
         contentContainerStyle={styles.scroll}
         keyboardShouldPersistTaps="handled"
@@ -264,7 +268,11 @@ export default function ForgotPasswordScreen() {
             ))}
           </View>
 
-          <Text style={styles.icon}>{current.icon}</Text>
+          <Image
+            source={current.icon}
+            style={styles.iconImg}
+            resizeMode="contain"
+          />
           <Text style={styles.title}>{current.title}</Text>
           <Text style={styles.subtitle}>{current.subtitle}</Text>
 
@@ -276,7 +284,7 @@ export default function ForgotPasswordScreen() {
                 selectTextOnFocus
                 style={styles.input}
                 placeholder={t("forgotPassword.emailPlaceholder")}
-                placeholderTextColor="#9AA9A7"
+                placeholderTextColor={A.placeholder}
                 value={contact}
                 onChangeText={setContact}
                 keyboardType="email-address"
@@ -290,7 +298,7 @@ export default function ForgotPasswordScreen() {
                 disabled={isLoading}
               >
                 {isLoading ? (
-                  <ActivityIndicator color="#fff" />
+                  <ActivityIndicator color={A.onPrimary} />
                 ) : (
                   <Text style={styles.buttonText}>
                     {t("forgotPassword.sendCode")}
@@ -308,7 +316,7 @@ export default function ForgotPasswordScreen() {
                 selectTextOnFocus
                 style={[styles.input, styles.codeInput]}
                 placeholder="123456"
-                placeholderTextColor="#9AA9A7"
+                placeholderTextColor={A.placeholder}
                 value={code}
                 onChangeText={(t) => setCode(t.replace(/\D/g, "").slice(0, 6))}
                 keyboardType="number-pad"
@@ -321,7 +329,7 @@ export default function ForgotPasswordScreen() {
                 disabled={isLoading}
               >
                 {isLoading ? (
-                  <ActivityIndicator color="#fff" />
+                  <ActivityIndicator color={A.onPrimary} />
                 ) : (
                   <Text style={styles.buttonText}>
                     {t("forgotPassword.verifyCode")}
@@ -371,7 +379,7 @@ export default function ForgotPasswordScreen() {
                   selectTextOnFocus
                   style={styles.input}
                   placeholder={t("forgotPassword.newPasswordPlaceholder")}
-                  placeholderTextColor="#9AA9A7"
+                  placeholderTextColor={A.placeholder}
                   value={newPassword}
                   onChangeText={setNewPassword}
                   secureTextEntry={!showNewPassword}
@@ -390,14 +398,11 @@ export default function ForgotPasswordScreen() {
                   onPress={() => setShowNewPassword((v) => !v)}
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
-                  <Text
-                    style={{
-                      fontSize: T.title,
-                      opacity: showNewPassword ? 1 : 0.5,
-                    }}
-                  >
-                    👁️
-                  </Text>
+                  <Ionicons
+                    name={showNewPassword ? "eye" : "eye-off"}
+                    size={22}
+                    color={showNewPassword ? A.accent : A.textDim}
+                  />
                 </TouchableOpacity>
               </View>
               <Text style={[styles.label, { marginTop: 12 }]}>
@@ -413,7 +418,7 @@ export default function ForgotPasswordScreen() {
                       : null,
                   ]}
                   placeholder={t("forgotPassword.confirmPasswordPlaceholder")}
-                  placeholderTextColor="#9AA9A7"
+                  placeholderTextColor={A.placeholder}
                   value={confirmPassword}
                   onChangeText={setConfirmPassword}
                   secureTextEntry={!showConfirmPassword}
@@ -431,14 +436,11 @@ export default function ForgotPasswordScreen() {
                   onPress={() => setShowConfirmPassword((v) => !v)}
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
-                  <Text
-                    style={{
-                      fontSize: T.title,
-                      opacity: showConfirmPassword ? 1 : 0.5,
-                    }}
-                  >
-                    👁️
-                  </Text>
+                  <Ionicons
+                    name={showConfirmPassword ? "eye" : "eye-off"}
+                    size={22}
+                    color={showConfirmPassword ? A.accent : A.textDim}
+                  />
                 </TouchableOpacity>
               </View>
               {confirmPassword && newPassword !== confirmPassword && (
@@ -452,7 +454,7 @@ export default function ForgotPasswordScreen() {
                 disabled={isLoading}
               >
                 {isLoading ? (
-                  <ActivityIndicator color="#fff" />
+                  <ActivityIndicator color={A.onPrimary} />
                 ) : (
                   <Text style={styles.buttonText}>
                     {t("forgotPassword.changePasswordBtn")}
@@ -479,14 +481,11 @@ export default function ForgotPasswordScreen() {
 // Ista paleta kao login.tsx/register.tsx — prije je ovaj ekran koristio
 // posve drugu (svijetloplavu/ljubičastu #667eea na sivoj #f5f7fa) shemu
 // boja koja nije imala veze s ostatkom aplikacije.
-const GREEN_DEEPEST = "#0D2406";
-const GREEN_DARK = "#1B3F0E";
-const GREEN_MID = "#2D6418";
-const VALID_GREEN = "#4CAF50";
-const SILVER = "#9AA9A7";
-const SILVER_LIGHT = "#E8EEEE";
-const TEXT_DARK = "#142F09";
-const TEXT_MID = "#5C6765";
+const GREEN_DEEPEST = A.statusBar;
+const GREEN_DARK = A.bg;
+const VALID_GREEN = A.valid;
+const TEXT_DARK = A.text;
+const TEXT_MID = A.textDim;
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: GREEN_DARK },
@@ -498,7 +497,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   card: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: A.card,
+    borderWidth: 1,
+    borderColor: A.cardBorder,
     borderRadius: 24,
     padding: 28,
     width: "100%",
@@ -511,10 +512,10 @@ const styles = StyleSheet.create({
     elevation: 12,
   },
   progress: { flexDirection: "row", gap: 8, marginBottom: 28 },
-  dot: { width: 10, height: 10, borderRadius: 5, backgroundColor: "#D1DADB" },
-  dotActive: { backgroundColor: GREEN_MID, width: 24 },
+  dot: { width: 10, height: 10, borderRadius: 5, backgroundColor: A.divider },
+  dotActive: { backgroundColor: A.accent, width: 24 },
   dotDone: { backgroundColor: VALID_GREEN },
-  icon: { fontSize: 48, marginBottom: 14 },
+  iconImg: { width: 76, height: 76, marginBottom: 14 },
   title: {
     fontSize: T.screen,
     fontWeight: "800",
@@ -538,17 +539,17 @@ const styles = StyleSheet.create({
     marginBottom: 7,
   },
   input: {
-    backgroundColor: SILVER_LIGHT,
+    backgroundColor: A.inputBg,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
     fontSize: T.lead,
     borderWidth: 1.5,
-    borderColor: "#D1DADB",
+    borderColor: A.divider,
     color: TEXT_DARK,
     marginBottom: 8,
   },
-  inputError: { borderColor: "#C0392B" },
+  inputError: { borderColor: A.error },
   codeInput: {
     textAlign: "center",
     fontSize: 28,
@@ -556,28 +557,32 @@ const styles = StyleSheet.create({
     letterSpacing: 12,
   },
   button: {
-    backgroundColor: GREEN_MID,
+    backgroundColor: A.primary,
     borderRadius: 14,
     paddingVertical: 16,
     marginTop: 12,
     alignItems: "center",
-    shadowColor: GREEN_DEEPEST,
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 10,
     elevation: 6,
   },
-  buttonDisabled: { backgroundColor: SILVER, shadowOpacity: 0, elevation: 0 },
+  buttonDisabled: {
+    backgroundColor: A.primaryDisabled,
+    shadowOpacity: 0,
+    elevation: 0,
+  },
   buttonText: {
-    color: "#FFFFFF",
+    color: A.onPrimary,
     fontSize: T.lead,
     fontWeight: "700",
     letterSpacing: 0.5,
   },
   resendBtn: { marginTop: 16, alignItems: "center" },
-  resendText: { color: GREEN_MID, fontSize: T.body, fontWeight: "600" },
-  resendTextDisabled: { color: SILVER },
+  resendText: { color: A.accent, fontSize: T.body, fontWeight: "600" },
+  resendTextDisabled: { color: A.textDim },
   backBtn: { marginTop: 28 },
   backText: { color: TEXT_MID, fontSize: T.body },
-  errorText: { color: "#C0392B", fontSize: T.meta, marginBottom: 4 },
+  errorText: { color: A.error, fontSize: T.meta, marginBottom: 4 },
 });
