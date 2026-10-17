@@ -9,7 +9,6 @@ import {
   Image,
   KeyboardAvoidingView,
   Platform,
-  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
@@ -25,6 +24,7 @@ import { setSentryUser } from "./config/sentry";
 import * as Linking from "expo-linking";
 import { API_BASE_URL } from "./config/api";
 import { T } from "../styles/varaTheme";
+import { KeyboardSafeScrollView } from "../components/KeyboardSafeScrollView";
 
 // ─── Stiliziran VARA natpis ───────────────────────────────────────────────────
 function VaraWordmark() {
@@ -201,7 +201,7 @@ export default function LoginScreen() {
     >
       <StatusBar barStyle="light-content" backgroundColor={GREEN_DEEPEST} />
 
-      <ScrollView
+      <KeyboardSafeScrollView
         contentContainerStyle={s.scroll}
         keyboardShouldPersistTaps="handled"
         bounces={false}
@@ -231,7 +231,7 @@ export default function LoginScreen() {
 
           <FormField
             label={t("auth.username")}
-            placeholder="npr. ana_horvat"
+            placeholder={t("auth.usernamePlaceholder")}
             helperText={t("auth.usernameHelperLogin")}
             value={username}
             onChangeText={setUsername}
@@ -243,7 +243,7 @@ export default function LoginScreen() {
 
           <FormField
             label={t("auth.password")}
-            placeholder="Unesi lozinku"
+            placeholder={t("auth.passwordPlaceholder")}
             helperText={t("auth.passwordHelperLogin")}
             value={password}
             onChangeText={setPassword}
@@ -330,7 +330,7 @@ export default function LoginScreen() {
         >
           {t("auth.privacyLink")}
         </Text>
-      </ScrollView>
+      </KeyboardSafeScrollView>
     </KeyboardAvoidingView>
   );
 }

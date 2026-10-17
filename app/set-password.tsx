@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { API_ENDPOINTS } from "./config/api";
 import { T } from "../styles/varaTheme";
+import { KeyboardSafeScrollView } from "../components/KeyboardSafeScrollView";
 
 type PasswordStrength = "empty" | "weak" | "medium" | "strong";
 
@@ -133,7 +134,10 @@ export default function SetPasswordScreen() {
   const strength = getPasswordStrength(password);
 
   return (
-    <View style={s.root}>
+    <KeyboardSafeScrollView
+      style={{ backgroundColor: "#1B3F0E" }}
+      contentContainerStyle={s.root}
+    >
       <Text style={s.title}>Postavi lozinku</Text>
       <Text style={s.subtitle}>
         Trebat će ti za prijavu putem korisničkog imena, bez obzira registrirala
@@ -278,13 +282,13 @@ export default function SetPasswordScreen() {
           <Text style={s.saveBtnText}>Spremi i nastavi</Text>
         )}
       </TouchableOpacity>
-    </View>
+    </KeyboardSafeScrollView>
   );
 }
 
 const s = StyleSheet.create({
   root: {
-    flex: 1,
+    flexGrow: 1,
     backgroundColor: "#1B3F0E",
     padding: 24,
     justifyContent: "center",

@@ -12,7 +12,6 @@ import {
   Image,
   KeyboardAvoidingView,
   Platform,
-  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
@@ -25,6 +24,7 @@ import { API_ENDPOINTS } from "./config/api";
 import * as Linking from "expo-linking";
 import { API_BASE_URL } from "./config/api";
 import { T } from "../styles/varaTheme";
+import { KeyboardSafeScrollView } from "../components/KeyboardSafeScrollView";
 
 type PasswordStrength = "empty" | "weak" | "medium" | "strong";
 
@@ -279,7 +279,7 @@ export default function RegisterScreen() {
     >
       <StatusBar barStyle="light-content" backgroundColor="#0D2406" />
 
-      <ScrollView
+      <KeyboardSafeScrollView
         contentContainerStyle={s.scroll}
         keyboardShouldPersistTaps="handled"
       >
@@ -316,7 +316,7 @@ export default function RegisterScreen() {
                     s.input,
                     form.firstName.trim().length > 0 && s.inputValid,
                   ]}
-                  placeholder="npr. Ana"
+                  placeholder={t("auth.firstNamePlaceholder")}
                   placeholderTextColor="#9AA9A7"
                   value={form.firstName}
                   onChangeText={(v) => handleChange("firstName", v)}
@@ -337,7 +337,7 @@ export default function RegisterScreen() {
                     s.input,
                     form.lastName.trim().length > 0 && s.inputValid,
                   ]}
-                  placeholder="npr. Horvat"
+                  placeholder={t("auth.lastNamePlaceholder")}
                   placeholderTextColor="#9AA9A7"
                   value={form.lastName}
                   onChangeText={(v) => handleChange("lastName", v)}
@@ -353,7 +353,7 @@ export default function RegisterScreen() {
 
           <Field
             label={`${t("auth.email").toUpperCase()} *`}
-            placeholder="npr. ana.horvat@gmail.com"
+            placeholder={t("auth.emailPlaceholder")}
             helperText={t("auth.emailHelperRegister")}
             value={form.email}
             onChangeText={(v) => handleChange("email", v)}
@@ -364,7 +364,7 @@ export default function RegisterScreen() {
           />
           <Field
             label={`${t("auth.username").toUpperCase()} *`}
-            placeholder="npr. ana_horvat"
+            placeholder={t("auth.usernamePlaceholder")}
             helperText={t("auth.usernameHelperRegister")}
             value={form.username}
             onChangeText={(v) => handleChange("username", v)}
@@ -381,7 +381,7 @@ export default function RegisterScreen() {
               <TextInput
                 selectTextOnFocus
                 style={[s.input, form.password.length >= 6 && s.inputValid]}
-                placeholder="Najmanje 6 znakova"
+                placeholder={t("forgotPassword.newPasswordPlaceholder")}
                 placeholderTextColor="#9AA9A7"
                 value={form.password}
                 onChangeText={(v) => handleChange("password", v)}
@@ -597,7 +597,7 @@ export default function RegisterScreen() {
         >
           {t("auth.privacyLink")}
         </Text>
-      </ScrollView>
+      </KeyboardSafeScrollView>
     </KeyboardAvoidingView>
   );
 }

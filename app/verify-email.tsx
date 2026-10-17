@@ -11,7 +11,6 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
-  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
@@ -21,6 +20,7 @@ import {
 } from "react-native";
 import { API_ENDPOINTS } from "./config/api";
 import { T } from "../styles/varaTheme";
+import { KeyboardSafeScrollView } from "../components/KeyboardSafeScrollView";
 
 /** Poslužitelj ne šalje novi kod češće od jednom u minuti. */
 const RESEND_SECONDS = 60;
@@ -116,7 +116,7 @@ export default function VerifyEmailScreen() {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <StatusBar barStyle="light-content" backgroundColor="#0D2406" />
-      <ScrollView
+      <KeyboardSafeScrollView
         contentContainerStyle={styles.scroll}
         keyboardShouldPersistTaps="handled"
       >
@@ -181,7 +181,7 @@ export default function VerifyEmailScreen() {
             <Text style={styles.backText}>{t("verifyEmail.backToLogin")}</Text>
           </TouchableOpacity>
         </View>
-      </ScrollView>
+      </KeyboardSafeScrollView>
     </KeyboardAvoidingView>
   );
 }
