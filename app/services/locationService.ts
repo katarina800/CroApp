@@ -1498,6 +1498,11 @@ function elementMatchesRule(el: any, rule: CategoryRule): boolean {
   });
 }
 
+/** Dijagnostika u Metro terminalu (samo u razvoju) — vidi se što i koliko traje. */
+const plog = (...args: unknown[]) => {
+  if (__DEV__) console.log("[places]", ...args);
+};
+
 /** Javni Overpass poslužitelji, redom po pouzdanosti. */
 const OVERPASS_ENDPOINTS = [
   "https://overpass-api.de/api/interpreter",
@@ -1546,16 +1551,26 @@ function fetchOverpassElements(query: string): Promise<any[] | null> {
       // Sljedeći poslužitelj kreće i ako ovaj samo kasni.
       timers.push(setTimeout(launchNext, OVERPASS_HEDGE_MS));
 
-      const failed = () => {
+      const t0 = Date.now();
+      const host = endpoint.split("/")[2];
+      const failed = (why?: unknown) => {
         pending--;
         if (settled) return;
+        plog(
+          `Overpass ${host} FAILED after ${Date.now() - t0}ms:`,
+          String(why),
+        );
         if (nextIdx < OVERPASS_ENDPOINTS.length) launchNext();
         else if (pending === 0) finish(null);
       };
 
       fetch(endpoint, {
         method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          Accept: "application/json",
+          "User-Agent": "CroMapApp/1.0",
+        },
         body: `data=${encodeURIComponent(query)}`,
         signal: ctrl.signal,
       })
@@ -1568,9 +1583,12 @@ function fetchOverpassElements(query: string): Promise<any[] | null> {
             (data.elements.length === 0 &&
               /error|timeout/i.test(data.remark ?? ""))
           ) {
-            failed();
+            failed(data?.remark ?? "bad response");
             return;
           }
+          plog(
+            `Overpass ${host} OK in ${Date.now() - t0}ms, ${data.elements.length} elements`,
+          );
           finish(data.elements);
         })
         .catch(failed);
@@ -1776,6 +1794,7 @@ async function loadPlacesUncached(
   cacheKey: string,
 ): Promise<PlacesResult> {
   const radiusM = Math.round(radiusKm * 1000);
+  const tStart = Date.now();
 
   // Blok smještajnih ključnih riječi za theater (koristi se na dva mjesta)
   const THEATER_BLOCK = [
@@ -1923,6 +1942,9 @@ async function loadPlacesUncached(
 
   // Nepotpun rezultat se ne sprema: ponovni pokušaj mora ići na mrežu, a ne
   // vratiti isti prazan prikaz iz cachea.
+  plog(
+    `${types.length} categories, ${deduped.length} places, ${failed ? "INCOMPLETE" : "ok"}, ${Date.now() - tStart}ms`,
+  );
   if (!failed) {
     placesCache.set(cacheKey, { places: deduped, timestamp: Date.now() });
   }

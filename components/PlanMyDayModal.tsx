@@ -1753,6 +1753,12 @@ export function PlanMyDayModal({
 
     setLoadingStep(0);
     setStep("loading");
+    const tPlan = Date.now();
+    if (__DEV__) {
+      console.log(
+        `[plan] generating for "${destination}", known coords: ${destCoords ? "yes" : "no"}, radius ${activityRadius ?? 5} km`,
+      );
+    }
 
     loadingInterval.current = setInterval(() => {
       setLoadingStep((prev) => (prev + 1) % LOADING_MESSAGES.length);
@@ -1778,6 +1784,15 @@ export function PlanMyDayModal({
         }),
       ]).finally(() => clearTimeout(budgetTimer));
 
+      if (__DEV__) {
+        console.log(
+          `[plan] venues ready in ${Date.now() - tPlan}ms: ${Object.entries(
+            venues,
+          )
+            .map(([k, v]) => `${k}=${v.length}`)
+            .join(" ")}`,
+        );
+      }
       setAllVenues(venues);
       setGeocodedCoords(
         geocoded
@@ -1829,6 +1844,12 @@ export function PlanMyDayModal({
 
       setStep("result");
     } catch (err) {
+      if (__DEV__) {
+        console.log(
+          `[plan] FAILED after ${Date.now() - tPlan}ms:`,
+          String(err),
+        );
+      }
       if (loadingInterval.current) clearInterval(loadingInterval.current);
       Alert.alert(t("common.error"), t("plan.planError"));
       setStep("form");

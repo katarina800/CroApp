@@ -10343,6 +10343,12 @@ export default function DashboardScreen() {
     const seq = ++loadSeqRef.current;
     const loadKey = `${selectedTypes.join(",")}|${activeSearchLoc.latitude.toFixed(3)},${activeSearchLoc.longitude.toFixed(3)}|${radius}`;
     let sourceFailed = false;
+    const tLoad = Date.now();
+    if (__DEV__) {
+      console.log(
+        `[map] loading ${selectedTypes.length} categories (${selectedTypes.join(",")}), radius ${radius} km, Google key: ${GOOGLE_KEY ? "yes" : "NO"}`,
+      );
+    }
     setIsLoadingPlaces(true);
     setIsLoadingMore(true);
     try {
@@ -10812,10 +10818,20 @@ export default function DashboardScreen() {
 
       await Promise.all([
         googleP.then((list) => {
+          if (__DEV__) {
+            console.log(
+              `[map] Google: ${list.length} places in ${Date.now() - tLoad}ms`,
+            );
+          }
           googleList = list;
           render();
         }),
         osmP.then((res) => {
+          if (__DEV__) {
+            console.log(
+              `[map] OSM: ${res.places.length} places${res.failed ? " (FAILED)" : ""} in ${Date.now() - tLoad}ms`,
+            );
+          }
           osmResult = res;
           sourceFailed = res.failed;
           render();
