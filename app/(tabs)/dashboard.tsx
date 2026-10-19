@@ -9101,7 +9101,7 @@ async function fetchGoogleNearby(
         (async (): Promise<Place[]> => {
           try {
             const ctrl = new AbortController();
-            const tid = setTimeout(() => ctrl.abort(), 10000);
+            const tid = setTimeout(() => ctrl.abort(), 8000);
             // ← KLJUČNA PROMJENA: za "food" tip dodaj keyword=fast_food
             const extraParam =
               googleType === "food" ? "&keyword=fast_food" : "";
@@ -9744,6 +9744,8 @@ export default function DashboardScreen() {
   // Broj koji se prikazuje na karti
   const [displayLimit, setDisplayLimit] = useState(INITIAL_RESULTS_LIMIT);
   const [isLoadingPlaces, setIsLoadingPlaces] = useState(false);
+  // Prvi rezultati su već na karti, ali drugi izvor još dopunjuje popis.
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   // Ishod zadnjeg dohvata: za koji je izbor i je li izvor zakazao. Bez toga
   // se "još učitavam" i "nema ničega" ne mogu razlikovati — oba su bila 0/0.
   const [lastLoad, setLastLoad] = useState<{
@@ -10094,10 +10096,11 @@ export default function DashboardScreen() {
       setAllPlaces([]);
       setLastLoad(null);
       setIsLoadingPlaces(false);
+      setIsLoadingMore(false);
       return;
     }
 
-    const timer = setTimeout(loadPlacesInRadius, 400);
+    const timer = setTimeout(loadPlacesInRadius, 250);
     return () => clearTimeout(timer);
   }, [
     activeSearchLoc?.latitude,
@@ -10341,466 +10344,496 @@ export default function DashboardScreen() {
     const loadKey = `${selectedTypes.join(",")}|${activeSearchLoc.latitude.toFixed(3)},${activeSearchLoc.longitude.toFixed(3)}|${radius}`;
     let sourceFailed = false;
     setIsLoadingPlaces(true);
+    setIsLoadingMore(true);
     try {
-      // 1. Pokušaj Google Places Nearby Search (precizniji, ima McDonald's itd.)
-      let filtered: Place[] = [];
-
-      if (GOOGLE_KEY) {
-        const googlePlaces = await fetchGoogleNearby(
-          activeSearchLoc.latitude,
-          activeSearchLoc.longitude,
-          radius * 1000,
-          selectedTypes,
-        );
-        filtered = googlePlaces;
-      }
-
-      // 2. OSM Overpass kao dodatak/fallback
-      const osm = await getPlacesInRadiusDetailed(
+      // Dva izvora rade ISTODOBNO. Google je obično gotov za ~1 s, OSM zna
+      // trajati puno dulje — prije se čekalo jedno pa drugo i tek onda išta
+      // pokazalo ("Učitavam mjesta…" bez kraja). Sad se prikaže ono što
+      // prvo stigne, a drugi izvor ga nadopuni.
+      const googleP: Promise<Place[]> = GOOGLE_KEY
+        ? fetchGoogleNearby(
+            activeSearchLoc.latitude,
+            activeSearchLoc.longitude,
+            radius * 1000,
+            selectedTypes,
+          ).catch(() => [])
+        : Promise.resolve([]);
+      const osmP = getPlacesInRadiusDetailed(
         activeSearchLoc.latitude,
         activeSearchLoc.longitude,
         radius,
         selectedTypes as any,
       );
-      const osmPlaces = osm.places;
-      sourceFailed = osm.failed;
 
-      // 3. Spoji oba izvora, dedupliciraj
-      // 3. Spoji oba izvora, dedupliciraj (nova logika - po imenu + udaljenosti)
-      // 3. Spoji oba izvora, dedupliciraj
-      const combined = [...filtered, ...osmPlaces];
-      const seen = new Map<string, Place>();
-      const deduped: Place[] = [];
+      // Spajanje, deduplikacija i filtri po kategorijama. Zove se i za prvi
+      // (djelomični) prikaz i za završni.
+      const buildList = (combined: Place[]): Place[] => {
+        const seen = new Map<string, Place>();
+        const deduped: Place[] = [];
 
-      for (const p of combined) {
-        if (hiddenPlaceIds.includes(p.id)) continue;
+        for (const p of combined) {
+          if (hiddenPlaceIds.includes(p.id)) continue;
 
-        const dist = haversineKm(
-          activeSearchLoc.latitude,
-          activeSearchLoc.longitude,
-          p.latitude,
-          p.longitude,
-        );
-        if (dist > radius * 1.1) continue;
-
-        // Normalizacija — ukloni prefikse "hotel ", "hostel " itd. za bolji dedup
-        const normalizeAccommodationName = (name: string): string => {
-          return name
-            .toLowerCase()
-            .trim()
-            .replace(
-              /^(hotel|hostel|apartman|apartments|motel|villa|resort)\s+/i,
-              "",
-            )
-            .replace(
-              /\s+(hotel|hostel|apartman|apartments|motel|villa|resort)$/i,
-              "",
-            );
-        };
-
-        const museumKeywords = ["muzej", "museum", "galerija", "gallery"];
-        const normalizeName = (name: string, type: string): string => {
-          const n = name.toLowerCase().trim();
-          if (type === "accommodation") return normalizeAccommodationName(name);
-          if (type === "museum") {
-            return n
-              .replace(/^(muzej|museum|galerija|gallery)\s+/i, "")
-              .replace(/\s+(muzej|museum|galerija|gallery)$/i, "")
-              .replace(/\s+of\s+/gi, " ") // "Museum of Slavonia" → "slavonia"
-              .replace(/\s+slavonije$/i, " slavonia") // HR→EN normalizacija
-              .replace(/\s+grada\s+/gi, " ") // "Muzej grada Osijeka" → "osijeka"
-              .replace(/\s+likovnih\s+/gi, " ")
-              .trim();
-          }
-          return n;
-        };
-
-        const nameKey = normalizeName(p.name, p.type);
-
-        const existing = seen.get(nameKey);
-
-        if (existing) {
-          const distBetween = haversineKm(
-            existing.latitude,
-            existing.longitude,
+          const dist = haversineKm(
+            activeSearchLoc.latitude,
+            activeSearchLoc.longitude,
             p.latitude,
             p.longitude,
           );
-          if (distBetween < 0.2) continue;
+          if (dist > radius * 1.1) continue;
+
+          // Normalizacija — ukloni prefikse "hotel ", "hostel " itd. za bolji dedup
+          const normalizeAccommodationName = (name: string): string => {
+            return name
+              .toLowerCase()
+              .trim()
+              .replace(
+                /^(hotel|hostel|apartman|apartments|motel|villa|resort)\s+/i,
+                "",
+              )
+              .replace(
+                /\s+(hotel|hostel|apartman|apartments|motel|villa|resort)$/i,
+                "",
+              );
+          };
+
+          const museumKeywords = ["muzej", "museum", "galerija", "gallery"];
+          const normalizeName = (name: string, type: string): string => {
+            const n = name.toLowerCase().trim();
+            if (type === "accommodation")
+              return normalizeAccommodationName(name);
+            if (type === "museum") {
+              return n
+                .replace(/^(muzej|museum|galerija|gallery)\s+/i, "")
+                .replace(/\s+(muzej|museum|galerija|gallery)$/i, "")
+                .replace(/\s+of\s+/gi, " ") // "Museum of Slavonia" → "slavonia"
+                .replace(/\s+slavonije$/i, " slavonia") // HR→EN normalizacija
+                .replace(/\s+grada\s+/gi, " ") // "Muzej grada Osijeka" → "osijeka"
+                .replace(/\s+likovnih\s+/gi, " ")
+                .trim();
+            }
+            return n;
+          };
+
+          const nameKey = normalizeName(p.name, p.type);
+
+          const existing = seen.get(nameKey);
+
+          if (existing) {
+            const distBetween = haversineKm(
+              existing.latitude,
+              existing.longitude,
+              p.latitude,
+              p.longitude,
+            );
+            if (distBetween < 0.2) continue;
+          }
+
+          // ── Dodatna provjera za muzeje: isti tip + unutar 150m = duplikat
+          // čak i ako se nazivi razlikuju (HR vs EN prijevodi)
+          if (
+            p.type === "museum" ||
+            p.type === "landmark" ||
+            p.type === "theater"
+          ) {
+            const nearDuplicate = deduped.find((existing) => {
+              if (existing.type !== p.type) return false;
+              return (
+                haversineKm(
+                  existing.latitude,
+                  existing.longitude,
+                  p.latitude,
+                  p.longitude,
+                ) < 0.15
+              ); // 150 metara — isti objekt, drugačiji jezik
+            });
+            if (nearDuplicate) continue;
+          }
+
+          seen.set(nameKey, p);
+          deduped.push(p);
         }
 
-        // ── Dodatna provjera za muzeje: isti tip + unutar 150m = duplikat
-        // čak i ako se nazivi razlikuju (HR vs EN prijevodi)
-        if (
-          p.type === "museum" ||
-          p.type === "landmark" ||
-          p.type === "theater"
-        ) {
-          const nearDuplicate = deduped.find((existing) => {
-            if (existing.type !== p.type) return false;
-            return (
-              haversineKm(
-                existing.latitude,
-                existing.longitude,
-                p.latitude,
-                p.longitude,
-              ) < 0.15
-            ); // 150 metara — isti objekt, drugačiji jezik
-          });
-          if (nearDuplicate) continue;
-        }
+        // ── STROGI POST-FILTER ZA THEATER ──────────────────────────────
+        const THEATER_HARD_BLOCK = [
+          "hotel",
+          "hostel",
+          "apartman",
+          "apartment",
+          "apartments",
+          "soba",
+          "sobe",
+          "rooms",
+          "room",
+          "guest",
+          "guesthouse",
+          "villa",
+          "vila",
+          "resort",
+          "inn",
+          "motel",
+          "lodging",
+          "accommodation",
+          "smještaj",
+          "bed",
+          "breakfast",
+          "b&b",
+          "studio",
+          "suite",
+          "camp",
+          "glamping",
+          "pansion",
+          "pension",
+          "nekretnin",
+          "centar nekretnina",
+        ];
 
-        seen.set(nameKey, p);
-        deduped.push(p);
-      }
+        const theaterFiltered = deduped.filter((p) => {
+          if (p.type !== "theater") return true;
+          const n = p.name.toLowerCase().trim();
+          const isRealTheater =
+            n.includes("kazalište") ||
+            n.includes("kazaliste") ||
+            n.includes("teatar") ||
+            n.includes("theatre") ||
+            n.includes("theater") ||
+            n.includes("hnk") ||
+            n.includes("dječje") ||
+            n.includes("narodno");
+          if (!isRealTheater) return false;
+          return !nameMatchesDenylist(n, THEATER_HARD_BLOCK);
+        });
 
-      // ── STROGI POST-FILTER ZA THEATER ──────────────────────────────
-      const THEATER_HARD_BLOCK = [
-        "hotel",
-        "hostel",
-        "apartman",
-        "apartment",
-        "apartments",
-        "soba",
-        "sobe",
-        "rooms",
-        "room",
-        "guest",
-        "guesthouse",
-        "villa",
-        "vila",
-        "resort",
-        "inn",
-        "motel",
-        "lodging",
-        "accommodation",
-        "smještaj",
-        "bed",
-        "breakfast",
-        "b&b",
-        "studio",
-        "suite",
-        "camp",
-        "glamping",
-        "pansion",
-        "pension",
-        "nekretnin",
-        "centar nekretnina",
-      ];
+        // ── POST-FILTER ZA CLUB ─────────────────────────────────────────
+        const CLUB_HARD_BLOCK = [
+          "salon za pse",
+          "dog salon",
+          "pet salon",
+          "grooming",
+          "ljubimac",
+          "kućni ljubimac",
+          "njega pasa",
+          "uređivanje pasa",
+          "šišanje pasa",
+          "frizerski salon",
+          "frizersk",
+          "frizer",
+          "hair salon",
+          "brijačnica",
+          "barber",
+          "automat",
+          "gaming",
+          "slot",
+          "tombola",
+          "kladionica",
+          "mozzart",
+          "winbet",
+          "superbet",
+          "lvbet",
+          "admiral",
+          "casino",
+          "kockarnica",
+          "kozmetik",
+          "beauty",
+          "estetik",
+          "nail",
+          "manikur",
+          "pedikur",
+          "fitness",
+          "gym",
+          "teretana",
+          "nekretnin",
+          "d.o.o",
+          "obrt",
+        ];
 
-      const theaterFiltered = deduped.filter((p) => {
-        if (p.type !== "theater") return true;
-        const n = p.name.toLowerCase().trim();
-        const isRealTheater =
-          n.includes("kazalište") ||
-          n.includes("kazaliste") ||
-          n.includes("teatar") ||
-          n.includes("theatre") ||
-          n.includes("theater") ||
-          n.includes("hnk") ||
-          n.includes("dječje") ||
-          n.includes("narodno");
-        if (!isRealTheater) return false;
-        return !nameMatchesDenylist(n, THEATER_HARD_BLOCK);
-      });
+        const finalFiltered = theaterFiltered.filter((p) => {
+          if (p.type !== "club") return true;
+          const n = p.name.toLowerCase().trim();
+          return !nameMatchesDenylist(n, CLUB_HARD_BLOCK);
+        });
 
-      // ── POST-FILTER ZA CLUB ─────────────────────────────────────────
-      const CLUB_HARD_BLOCK = [
-        "salon za pse",
-        "dog salon",
-        "pet salon",
-        "grooming",
-        "ljubimac",
-        "kućni ljubimac",
-        "njega pasa",
-        "uređivanje pasa",
-        "šišanje pasa",
-        "frizerski salon",
-        "frizersk",
-        "frizer",
-        "hair salon",
-        "brijačnica",
-        "barber",
-        "automat",
-        "gaming",
-        "slot",
-        "tombola",
-        "kladionica",
-        "mozzart",
-        "winbet",
-        "superbet",
-        "lvbet",
-        "admiral",
-        "casino",
-        "kockarnica",
-        "kozmetik",
-        "beauty",
-        "estetik",
-        "nail",
-        "manikur",
-        "pedikur",
-        "fitness",
-        "gym",
-        "teretana",
-        "nekretnin",
-        "d.o.o",
-        "obrt",
-      ];
+        const LANDMARK_BLOCK = [
+          "hostel",
+          "hotel",
+          "sobe",
+          "rooms",
+          "guest house",
+          "guest",
+          "guesthouse",
+          "apartman",
+          "apartment",
+          "apartments",
+          "studio",
+          "perla",
+          "waldinger",
+          "prenočište",
+          "smještaj",
+          "accommodation",
+          "lodging",
+          "villa",
+          "vila",
+          "resort",
+          "inn",
+          "motel",
+          "advent",
+          "festival",
+          "sajam",
+          "wine & walk",
+          "wine walk",
+          "winterland",
+          "muzej",
+          "museum",
+          "arhiv",
+          "archive",
+          "shell museum",
+          "water world",
+          "osijek",
+          "zagreb",
+          "split",
+          "rijeka",
+          "varaždin",
+          "farm stay",
+          "lacković",
+          "biljski krokodil",
+          "krokodil",
+          "sakuntala", // ← DODANO
+          "centar nekretnina", // ← DODANO
+          "centar nekretnine", // ← DODANO
+          "nekretnin", // ← DODANO
+        ];
 
-      const finalFiltered = theaterFiltered.filter((p) => {
-        if (p.type !== "club") return true;
-        const n = p.name.toLowerCase().trim();
-        return !nameMatchesDenylist(n, CLUB_HARD_BLOCK);
-      });
+        const fullyFiltered = finalFiltered.filter((p) => {
+          if (p.type !== "landmark") return true;
+          const n = p.name.toLowerCase();
+          return !nameMatchesDenylist(n, LANDMARK_BLOCK);
+        });
 
-      const LANDMARK_BLOCK = [
-        "hostel",
-        "hotel",
-        "sobe",
-        "rooms",
-        "guest house",
-        "guest",
-        "guesthouse",
-        "apartman",
-        "apartment",
-        "apartments",
-        "studio",
-        "perla",
-        "waldinger",
-        "prenočište",
-        "smještaj",
-        "accommodation",
-        "lodging",
-        "villa",
-        "vila",
-        "resort",
-        "inn",
-        "motel",
-        "advent",
-        "festival",
-        "sajam",
-        "wine & walk",
-        "wine walk",
-        "winterland",
-        "muzej",
-        "museum",
-        "arhiv",
-        "archive",
-        "shell museum",
-        "water world",
-        "osijek",
-        "zagreb",
-        "split",
-        "rijeka",
-        "varaždin",
-        "farm stay",
-        "lacković",
-        "biljski krokodil",
-        "krokodil",
-        "sakuntala", // ← DODANO
-        "centar nekretnina", // ← DODANO
-        "centar nekretnine", // ← DODANO
-        "nekretnin", // ← DODANO
-      ];
+        const MUSEUM_BLOCK = [
+          "bridge bench",
+          "bench",
+          "war scarred",
+          "scarred building",
+          "katakomba",
+          "catacomb", // ← vraćeno: blokira "Catacombs Osijek" u muzejima
+          "catacombs", // ← vraćeno: Google Places vraća pod museum tipom
+          "most",
+          "bridge",
+          "shell museum",
+          "water world",
+          "školjaka",
+          "skoljaka",
+          "building",
+          "ruin",
+          "ruins",
+          "atrakcija",
+        ];
+        const museumFiltered = fullyFiltered.filter((p) => {
+          if (p.type !== "museum") return true;
+          const n = p.name.toLowerCase();
+          return !nameMatchesDenylist(n, MUSEUM_BLOCK);
+        });
 
-      const fullyFiltered = finalFiltered.filter((p) => {
-        if (p.type !== "landmark") return true;
-        const n = p.name.toLowerCase();
-        return !nameMatchesDenylist(n, LANDMARK_BLOCK);
-      });
+        const PARK_HARD_BLOCK = [
+          "fićo",
+          "red fić",
+          "konoba",
+          "restoran",
+          "caffe",
+          "bar",
+          "podgorje",
+          "suvara",
+          "kraševo",
+          "krasevo",
+          "bikana",
+          "čimen",
+          "cimen",
+          "južni blok",
+          "juzni blok",
+          "removac",
+          "removač",
+          "blok",
+          "naselje",
+          "zaselak",
+          "zaselje",
+          "ulica",
+          "trg",
+          "cesta",
+          "sa morem",
+          "predio",
+          "predjel",
+          "zona",
+          "četvrt",
+          "cetvrt",
+          "kvart",
+        ];
+        const parkFiltered = museumFiltered.filter((p) => {
+          if (p.type !== "park") return true;
+          const n = p.name.toLowerCase();
+          return !nameMatchesDenylist(n, PARK_HARD_BLOCK);
+        });
 
-      const MUSEUM_BLOCK = [
-        "bridge bench",
-        "bench",
-        "war scarred",
-        "scarred building",
-        "katakomba",
-        "catacomb", // ← vraćeno: blokira "Catacombs Osijek" u muzejima
-        "catacombs", // ← vraćeno: Google Places vraća pod museum tipom
-        "most",
-        "bridge",
-        "shell museum",
-        "water world",
-        "školjaka",
-        "skoljaka",
-        "building",
-        "ruin",
-        "ruins",
-        "atrakcija",
-      ];
-      const museumFiltered = fullyFiltered.filter((p) => {
-        if (p.type !== "museum") return true;
-        const n = p.name.toLowerCase();
-        return !nameMatchesDenylist(n, MUSEUM_BLOCK);
-      });
+        const LANDMARK_EMPLOYMENT_BLOCK = [
+          "employment service",
+          "zapošljavanj",
+          "zavod za zaposl",
+          "hzz",
+          "porezna uprava",
+          "ured za",
+          "državni ured",
+        ];
+        const landmarkExtra = parkFiltered.filter((p) => {
+          if (p.type !== "landmark") return true;
+          const n = p.name.toLowerCase();
+          return !nameMatchesDenylist(n, LANDMARK_EMPLOYMENT_BLOCK);
+        });
 
-      const PARK_HARD_BLOCK = [
-        "fićo",
-        "red fić",
-        "konoba",
-        "restoran",
-        "caffe",
-        "bar",
-        "podgorje",
-        "suvara",
-        "kraševo",
-        "krasevo",
-        "bikana",
-        "čimen",
-        "cimen",
-        "južni blok",
-        "juzni blok",
-        "removac",
-        "removač",
-        "blok",
-        "naselje",
-        "zaselak",
-        "zaselje",
-        "ulica",
-        "trg",
-        "cesta",
-        "sa morem",
-        "predio",
-        "predjel",
-        "zona",
-        "četvrt",
-        "cetvrt",
-        "kvart",
-      ];
-      const parkFiltered = museumFiltered.filter((p) => {
-        if (p.type !== "park") return true;
-        const n = p.name.toLowerCase();
-        return !nameMatchesDenylist(n, PARK_HARD_BLOCK);
-      });
+        // ── POST-FILTER ZA SPA — mora biti ZADNJI, nakon museumFiltered ──
+        const SPA_HARD_BLOCK = [
+          // Medicinsko
+          "ambulanta",
+          "liječnik",
+          "doktor",
+          "medicina",
+          "medical",
+          "obiteljske",
+          "dežurna",
+          "fizioterapi",
+          "physio",
+          "rehabilitaci",
+          // Kozmetika — i s dijakriticima
+          "beauty",
+          "kozmetik",
+          "kozmetičk",
+          "estetik",
+          "estetica",
+          "estetska",
+          "salon",
+          "nail",
+          "manikur",
+          "pedikur",
+          // Fitness
+          "fitness",
+          "gym",
+          "teretana",
+          "crossfit",
+          "osobni trening",
+          "treninzi",
+          "pump",
+          // Tijelo/njega
+          "njegu",
+          "kulture tijela",
+          "centar kulture",
+          "sport i njegu",
+          "tensegrity",
+          "wellar",
+          "body service",
+          "body care",
+          // Studio/smještaj
+          "studio",
+          "apartman",
+          "apartment",
+          "hotel",
+          "hostel",
+          // Poslovno
+          "obrt",
+          "d.o.o",
+          "nekretnin",
+          "ljekarnica",
+          "apoteka",
+          "wellness centar",
+        ];
 
-      const LANDMARK_EMPLOYMENT_BLOCK = [
-        "employment service",
-        "zapošljavanj",
-        "zavod za zaposl",
-        "hzz",
-        "porezna uprava",
-        "ured za",
-        "državni ured",
-      ];
-      const landmarkExtra = parkFiltered.filter((p) => {
-        if (p.type !== "landmark") return true;
-        const n = p.name.toLowerCase();
-        return !nameMatchesDenylist(n, LANDMARK_EMPLOYMENT_BLOCK);
-      });
+        const spaFiltered = museumFiltered.filter((p) => {
+          if (p.type !== "spa") return true;
+          const n = p.name.toLowerCase();
+          return !nameMatchesDenylist(n, SPA_HARD_BLOCK);
+        });
 
-      // ── POST-FILTER ZA SPA — mora biti ZADNJI, nakon museumFiltered ──
-      const SPA_HARD_BLOCK = [
-        // Medicinsko
-        "ambulanta",
-        "liječnik",
-        "doktor",
-        "medicina",
-        "medical",
-        "obiteljske",
-        "dežurna",
-        "fizioterapi",
-        "physio",
-        "rehabilitaci",
-        // Kozmetika — i s dijakriticima
-        "beauty",
-        "kozmetik",
-        "kozmetičk",
-        "estetik",
-        "estetica",
-        "estetska",
-        "salon",
-        "nail",
-        "manikur",
-        "pedikur",
-        // Fitness
-        "fitness",
-        "gym",
-        "teretana",
-        "crossfit",
-        "osobni trening",
-        "treninzi",
-        "pump",
-        // Tijelo/njega
-        "njegu",
-        "kulture tijela",
-        "centar kulture",
-        "sport i njegu",
-        "tensegrity",
-        "wellar",
-        "body service",
-        "body care",
-        // Studio/smještaj
-        "studio",
-        "apartman",
-        "apartment",
-        "hotel",
-        "hostel",
-        // Poslovno
-        "obrt",
-        "d.o.o",
-        "nekretnin",
-        "ljekarnica",
-        "apoteka",
-        "wellness centar",
-      ];
+        // ← DODAJ OVDJE
+        const CINEMA_WHITELIST = [
+          "kino",
+          "cinema",
+          "cinestar",
+          "multiplex",
+          "kinoplex",
+          "cinemacity",
+          "kinodvor",
+          "art kino",
+          "filmski",
+          "imax",
+        ];
+        const cinemaFiltered = landmarkExtra.filter((p) => {
+          if (p.type !== "cinema") return true;
+          const n = p.name.toLowerCase();
+          return CINEMA_WHITELIST.some((kw) => n.includes(kw));
+        });
+        return cinemaFiltered;
+      };
 
-      const spaFiltered = museumFiltered.filter((p) => {
-        if (p.type !== "spa") return true;
-        const n = p.name.toLowerCase();
-        return !nameMatchesDenylist(n, SPA_HARD_BLOCK);
-      });
+      let googleList: Place[] | null = null;
+      let osmResult: { places: Place[]; failed: boolean } | null = null;
+      let fitted = false;
 
-      // ← DODAJ OVDJE
-      const CINEMA_WHITELIST = [
-        "kino",
-        "cinema",
-        "cinestar",
-        "multiplex",
-        "kinoplex",
-        "cinemacity",
-        "kinodvor",
-        "art kino",
-        "filmski",
-        "imax",
-      ];
-      const cinemaFiltered = landmarkExtra.filter((p) => {
-        if (p.type !== "cinema") return true;
-        const n = p.name.toLowerCase();
-        return CINEMA_WHITELIST.some((kw) => n.includes(kw));
-      });
+      const render = () => {
+        // Odgovor na stariji izbor ne smije pregaziti noviji.
+        if (seq !== loadSeqRef.current) return;
+        const combined = [...(googleList ?? []), ...(osmResult?.places ?? [])];
+        // Prazan djelomični rezultat ne briše prikaz — čeka se drugi izvor.
+        if (combined.length === 0 && !(googleList && osmResult)) return;
 
-      // Odgovor na stariji izbor ne smije pregaziti noviji.
-      if (seq !== loadSeqRef.current) return;
+        const list = buildList(combined);
+        list.sort((a, b) => (a.distance ?? 0) - (b.distance ?? 0));
+        setAllPlaces(list);
+        if (list.length > 0) setIsLoadingPlaces(false);
 
-      cinemaFiltered.sort((a, b) => (a.distance ?? 0) - (b.distance ?? 0));
-      setAllPlaces(cinemaFiltered); // ← landmarkExtra → cinemaFiltered
-      setLastLoad({ key: loadKey, failed: sourceFailed });
-
-      if (finalFiltered.length > 0 && mapRef.current) {
-        mapRef.current.fitToCoordinates(
-          [
-            ...finalFiltered.map((p) => ({
-              latitude: p.latitude,
-              longitude: p.longitude,
-            })),
+        // Kamera se namješta samo na prvi prikaz; kasnije dopune ne smiju
+        // pomicati kartu dok je korisnik već razgledava.
+        if (!fitted && list.length > 0 && mapRef.current) {
+          fitted = true;
+          mapRef.current.fitToCoordinates(
+            [
+              ...list.map((p) => ({
+                latitude: p.latitude,
+                longitude: p.longitude,
+              })),
+              {
+                latitude: activeSearchLoc.latitude,
+                longitude: activeSearchLoc.longitude,
+              },
+            ],
             {
-              latitude: activeSearchLoc.latitude,
-              longitude: activeSearchLoc.longitude,
+              edgePadding: { top: 110, right: 60, bottom: 150, left: 60 },
+              animated: true,
             },
-          ],
-          {
-            edgePadding: { top: 110, right: 60, bottom: 150, left: 60 },
-            animated: true,
-          },
-        );
-      }
+          );
+        }
+      };
+
+      await Promise.all([
+        googleP.then((list) => {
+          googleList = list;
+          render();
+        }),
+        osmP.then((res) => {
+          osmResult = res;
+          sourceFailed = res.failed;
+          render();
+        }),
+      ]);
+
+      if (seq !== loadSeqRef.current) return;
+      setLastLoad({ key: loadKey, failed: sourceFailed });
     } catch (e) {
       console.error(e);
       if (seq === loadSeqRef.current) {
         setLastLoad({ key: loadKey, failed: true });
       }
     } finally {
-      if (seq === loadSeqRef.current) setIsLoadingPlaces(false);
+      if (seq === loadSeqRef.current) {
+        setIsLoadingPlaces(false);
+        setIsLoadingMore(false);
+      }
     }
   };
 
@@ -12564,6 +12597,9 @@ export default function DashboardScreen() {
                       </Text>
                     )}
                   </View>
+                  {isLoadingMore && (
+                    <ActivityIndicator size="small" color="#a0d080" />
+                  )}
                   {loadFailed && retryBtn}
                   {hasMore && (
                     <TouchableOpacity

@@ -1031,7 +1031,7 @@ const GLOBAL_NAME_DENYLIST = [
 // ─── Cache ────────────────────────────────────────────────────────────────────
 let placesCache: Map<string, { places: Place[]; timestamp: number }> =
   new Map();
-const CACHE_DURATION = 5 * 60 * 1000;
+const CACHE_DURATION = 20 * 60 * 1000;
 
 export const clearPlacesCache = () => {
   placesCache.clear();
@@ -1078,7 +1078,7 @@ export const searchPlaces = async (
     if (lat && lon) url += `&lat=${lat}&lon=${lon}`;
 
     const ctrl = new AbortController();
-    const tid = setTimeout(() => ctrl.abort(), 10000);
+    const tid = setTimeout(() => ctrl.abort(), 6000);
     const res = await fetch(url, {
       headers: { "User-Agent": "CroMapApp/1.0" },
       signal: ctrl.signal,
@@ -1434,185 +1434,287 @@ function deduplicatePlaces(places: Place[]): Place[] {
   return result;
 }
 
-// ─── Glavni fetch s Overpass API ──────────────────────────────────────────────
-async function fetchFromOverpass(
+// ─── Overpass API ─────────────────────────────────────────────────────────────
+
+/**
+ * Upit kakav ga pišu pravila kategorija, razložen u uvjete — da se za
+ * pojedini element iz zajedničkog odgovora može reći koja ga je kategorija
+ * uopće tražila.
+ */
+interface ParsedQuery {
+  elType: string;
+  conds: {
+    key: string;
+    op: "exists" | "eq" | "re";
+    value: string;
+    ci: boolean;
+  }[];
+}
+
+const parsedQueryCache = new Map<string, ParsedQuery | null>();
+
+function parseQuery(q: string): ParsedQuery | null {
+  if (parsedQueryCache.has(q)) return parsedQueryCache.get(q) ?? null;
+  const head = q.match(/^(node|way|relation)((?:\[[^\]]*\])*)$/);
+  let parsed: ParsedQuery | null = null;
+  if (head) {
+    const conds: ParsedQuery["conds"] = [];
+    const re = /\["([^"]+)"(?:(=|~)"((?:[^"\\]|\\.)*)"(,i)?)?\]/g;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(head[2]))) {
+      conds.push({
+        key: m[1],
+        op: m[2] === "=" ? "eq" : m[2] === "~" ? "re" : "exists",
+        value: m[3] ?? "",
+        ci: !!m[4],
+      });
+    }
+    parsed = { elType: head[1], conds };
+  }
+  parsedQueryCache.set(q, parsed);
+  return parsed;
+}
+
+function elementMatchesQuery(el: any, pq: ParsedQuery): boolean {
+  if (el.type !== pq.elType) return false;
+  const tags = el.tags || {};
+  return pq.conds.every((c) => {
+    const v = tags[c.key];
+    if (v === undefined) return false;
+    if (c.op === "exists") return true;
+    if (c.op === "eq") return v === c.value;
+    try {
+      return new RegExp(c.value, c.ci ? "i" : "").test(v);
+    } catch {
+      return false;
+    }
+  });
+}
+
+function elementMatchesRule(el: any, rule: CategoryRule): boolean {
+  return rule.queries.some((q) => {
+    const pq = parseQuery(q);
+    return pq ? elementMatchesQuery(el, pq) : false;
+  });
+}
+
+/** Javni Overpass poslužitelji, redom po pouzdanosti. */
+const OVERPASS_ENDPOINTS = [
+  "https://overpass-api.de/api/interpreter",
+  "https://overpass.kumi.systems/api/interpreter",
+  "https://overpass.private.coffee/api/interpreter",
+];
+/** Ako prvi poslužitelj ne odgovori za toliko, paralelno se pita sljedeći. */
+const OVERPASS_HEDGE_MS = 2500;
+/** Dulje od ovoga korisnik ionako odustaje; bolje brza greška i ponovni pokušaj. */
+const OVERPASS_TIMEOUT_MS = 15000;
+
+/**
+ * Jedan upit prema Overpassu uz "hedging": odmah se pita prvi poslužitelj,
+ * a ako je spor ili zakaže, pita se sljedeći — dok prvi još radi. Prvi
+ * ispravan odgovor pobjeđuje, ostali se prekidaju. Prije se čekalo do 35 s
+ * na jedan poslužitelj pa tek onda pokušavalo drugi, a tamo gdje je prvi
+ * bio preopterećen to je značilo više od minute "Učitavam…".
+ *
+ * Vraća elemente, ili null ako nijedan poslužitelj nije uredno odgovorio —
+ * to se razlikuje od praznog polja, koje znači "tu doista nema ničega".
+ */
+function fetchOverpassElements(query: string): Promise<any[] | null> {
+  return new Promise((resolve) => {
+    let settled = false;
+    let pending = 0;
+    let nextIdx = 0;
+    const ctrls: AbortController[] = [];
+    const timers: ReturnType<typeof setTimeout>[] = [];
+
+    const finish = (value: any[] | null) => {
+      if (settled) return;
+      settled = true;
+      timers.forEach(clearTimeout);
+      ctrls.forEach((c) => c.abort());
+      resolve(value);
+    };
+
+    const launchNext = () => {
+      if (settled || nextIdx >= OVERPASS_ENDPOINTS.length) return;
+      const endpoint = OVERPASS_ENDPOINTS[nextIdx++];
+      pending++;
+
+      const ctrl = new AbortController();
+      ctrls.push(ctrl);
+      timers.push(setTimeout(() => ctrl.abort(), OVERPASS_TIMEOUT_MS));
+      // Sljedeći poslužitelj kreće i ako ovaj samo kasni.
+      timers.push(setTimeout(launchNext, OVERPASS_HEDGE_MS));
+
+      const failed = () => {
+        pending--;
+        if (settled) return;
+        if (nextIdx < OVERPASS_ENDPOINTS.length) launchNext();
+        else if (pending === 0) finish(null);
+      };
+
+      fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: `data=${encodeURIComponent(query)}`,
+        signal: ctrl.signal,
+      })
+        .then((res) => (res.ok ? res.json() : Promise.reject(res.status)))
+        .then((data) => {
+          // Preopterećen poslužitelj zna odgovoriti 200 s praznim poljem i
+          // napomenom o grešci — to nije "nema mjesta", to je neuspjeh.
+          if (
+            !Array.isArray(data?.elements) ||
+            (data.elements.length === 0 &&
+              /error|timeout/i.test(data.remark ?? ""))
+          ) {
+            failed();
+            return;
+          }
+          finish(data.elements);
+        })
+        .catch(failed);
+    };
+
+    launchNext();
+  });
+}
+
+/**
+ * Jedan upit za SVE tražene kategorije. Prije je svaka kategorija imala
+ * vlastiti zahtjev: plan putovanja je slao 17 upita odjednom, što javni
+ * poslužitelji ograničavaju (429/504), pa se čekalo i po nekoliko minuta ili
+ * se dobivalo ništa. Jedan zajednički upit je jedan zahtjev, a razvrstavanje
+ * po kategorijama obavi se ovdje, na uređaju.
+ */
+function fetchOverpassForTypes(
+  latitude: number,
+  longitude: number,
+  radiusM: number,
+  types: string[],
+): Promise<any[] | null> {
+  const center = `${latitude},${longitude}`;
+  const parts = new Set<string>();
+  for (const type of types) {
+    for (const q of CATEGORY_RULES[type]?.queries ?? []) parts.add(q);
+  }
+  const union = [...parts]
+    .map((q) => `${q}(around:${radiusM},${center});`)
+    .join("\n");
+
+  // "out center tags": way/relation dobivaju središte (bez njega nemaju
+  // koordinate pa bi ih se tiho odbacilo), a ne vuku se popisi čvorova.
+  const query = `[out:json][timeout:25];
+(
+${union}
+);
+out center tags;`;
+  return fetchOverpassElements(query);
+}
+
+/** Elementi koje je kategorija tražila → mjesta, uz filtre te kategorije. */
+function placesFromElements(
+  elements: any[],
   latitude: number,
   longitude: number,
   radiusM: number,
   type: string,
-): Promise<Place[] | null> {
+): Place[] {
   const rule = CATEGORY_RULES[type];
   if (!rule) return [];
 
-  const center = `${latitude},${longitude}`;
-  const parts = rule.queries
-    .map((q) => `${q}(around:${radiusM},${center});`)
-    .join("\n");
+  const results: Place[] = [];
 
-  // ✅ FIX: dodan "out center;" — bez njega `way` elementi nemaju koordinate
-  // (el.center je undefined), pa su svi way objekti (McDonald's kao way,
-  // OPG kao way, znamenitosti kao way) bili tiho filtrirani zbog !lat || !lon
-  const overpassQuery = `[out:json][timeout:30];
-(
-${parts}
-);
-out body center;`;
+  for (const el of elements) {
+    const tags = el.tags || {};
+    const name =
+      tags.name || tags["name:hr"] || tags["name:en"] || tags["official_name"];
+    if (!name) continue;
 
-  const endpoints = [
-    "https://overpass-api.de/api/interpreter",
-    "https://overpass.openstreetmap.fr/api/interpreter",
-  ];
+    // ✅ FIX: el.center sada postoji za way/relation jer koristimo "out body center;"
+    const lat = el.lat ?? el.center?.lat;
+    const lon = el.lon ?? el.center?.lon;
+    if (!lat || !lon) continue;
 
-  // Poslužitelj je barem jednom uredno odgovorio. Razlikuje "nema takvih
-  // mjesta" (prazan, ali ispravan odgovor) od "upit nije uspio" (429/504/
-  // timeout) — prije su oba završavala kao [] i spremala se u cache, pa je
-  // jedan neuspio upit davao prazan prikaz idućih 5 minuta.
-  let answered = false;
+    const dist = haversineKm(latitude, longitude, lat, lon);
+    if (dist > radiusM / 1000) continue;
 
-  for (const endpoint of endpoints) {
-    try {
-      const ctrl = new AbortController();
-      const tid = setTimeout(() => ctrl.abort(), 35000);
-      const res = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: `data=${encodeURIComponent(overpassQuery)}`,
-        signal: ctrl.signal,
-      });
-      clearTimeout(tid);
-      if (!res.ok) continue;
-
-      const data = await res.json();
-      answered = true;
-      if (!data.elements?.length) continue;
-
-      const results: Place[] = [];
-
-      for (const el of data.elements) {
-        const tags = el.tags || {};
-        const name =
-          tags.name ||
-          tags["name:hr"] ||
-          tags["name:en"] ||
-          tags["official_name"];
-        if (!name) continue;
-
-        // ✅ FIX: el.center sada postoji za way/relation jer koristimo "out body center;"
-        const lat = el.lat ?? el.center?.lat;
-        const lon = el.lon ?? el.center?.lon;
-        if (!lat || !lon) continue;
-
-        const dist = haversineKm(latitude, longitude, lat, lon);
-        if (dist > radiusM / 1000) continue;
-
-        if (type === "opg") {
-          // OPG grana ne prolazi kroz passesFilter, pa provjeru trajno
-          // zatvorenih/privatnih objekata treba i ovdje.
-          if (isPermanentlyClosedOrPrivate(tags)) continue;
-          if (!isValidOPG(tags, name)) continue;
-          if (nameMatchesDenylist(name, GLOBAL_NAME_DENYLIST)) continue;
-          if (nameMatchesDenylist(name, rule.nameDenylist)) continue;
-        } else {
-          if (!passesFilter(tags, name, rule)) continue;
-        }
-
-        // Posebna provjera za theater - odbij sve što liči na smještaj
-        // Theater: odbij smještaj, BEZ name whitelist — amenity=theatre je dovoljan
-        if (type === "theater") {
-          const nameLower = name.toLowerCase();
-          const accommodationIndicators = [
-            "hotel",
-            "hostel",
-            "apartman",
-            "apartment",
-            "soba",
-            "sobe",
-            "rooms",
-            "room",
-            "prenočište",
-            "prenoćište",
-            "guest",
-            "villa",
-            "vila",
-            "resort",
-            "odmaralište",
-            "pansion",
-            "motel",
-            "inn",
-            "b&b",
-            "bed",
-            "breakfast",
-            "smještaj",
-            "accommodation",
-            "lodging",
-            "studio",
-            "suite",
-            "camp",
-            "glamping",
-            "nekretnin",
-          ];
-          // Ista logika granice riječi: "inn" i "bed" su prekratki da bi se
-          // tražili kao podniz ("Betina", "Vinnica" nisu smještaj).
-          if (nameMatchesDenylist(name, accommodationIndicators)) {
-            continue;
-          }
-        }
-
-        results.push({
-          id: `osm_${el.type}_${el.id}`,
-          name,
-          latitude: lat,
-          longitude: lon,
-          type: type as Place["type"],
-          distance: dist,
-          address:
-            [tags["addr:street"], tags["addr:housenumber"], tags["addr:city"]]
-              .filter(Boolean)
-              .join(" ") || undefined,
-          phone: tags.phone || tags["contact:phone"] || undefined,
-          website: tags.website || tags["contact:website"] || undefined,
-          openingHours: tags.opening_hours || undefined,
-          // Izračunato iz zapisanog radnog vremena (null kad se ne može
-          // utvrditi). Dosad se popunjavalo samo iz Googleovog odgovora, pa su
-          // mjesta koja dolaze iz OpenStreetMapa uvijek bila "nepoznato".
-          openNow: isOpenAt(tags.opening_hours, new Date()),
-          rating: tags.stars ? parseFloat(tags.stars) : undefined,
-        });
-      }
-
-      return results;
-    } catch {
-      continue;
+    if (type === "opg") {
+      // OPG grana ne prolazi kroz passesFilter, pa provjeru trajno
+      // zatvorenih/privatnih objekata treba i ovdje.
+      if (isPermanentlyClosedOrPrivate(tags)) continue;
+      if (!isValidOPG(tags, name)) continue;
+      if (nameMatchesDenylist(name, GLOBAL_NAME_DENYLIST)) continue;
+      if (nameMatchesDenylist(name, rule.nameDenylist)) continue;
+    } else {
+      if (!passesFilter(tags, name, rule)) continue;
     }
+
+    // Posebna provjera za theater - odbij sve što liči na smještaj
+    // Theater: odbij smještaj, BEZ name whitelist — amenity=theatre je dovoljan
+    if (type === "theater") {
+      const nameLower = name.toLowerCase();
+      const accommodationIndicators = [
+        "hotel",
+        "hostel",
+        "apartman",
+        "apartment",
+        "soba",
+        "sobe",
+        "rooms",
+        "room",
+        "prenočište",
+        "prenoćište",
+        "guest",
+        "villa",
+        "vila",
+        "resort",
+        "odmaralište",
+        "pansion",
+        "motel",
+        "inn",
+        "b&b",
+        "bed",
+        "breakfast",
+        "smještaj",
+        "accommodation",
+        "lodging",
+        "studio",
+        "suite",
+        "camp",
+        "glamping",
+        "nekretnin",
+      ];
+      // Ista logika granice riječi: "inn" i "bed" su prekratki da bi se
+      // tražili kao podniz ("Betina", "Vinnica" nisu smještaj).
+      if (nameMatchesDenylist(name, accommodationIndicators)) {
+        continue;
+      }
+    }
+
+    results.push({
+      id: `osm_${el.type}_${el.id}`,
+      name,
+      latitude: lat,
+      longitude: lon,
+      type: type as Place["type"],
+      distance: dist,
+      address:
+        [tags["addr:street"], tags["addr:housenumber"], tags["addr:city"]]
+          .filter(Boolean)
+          .join(" ") || undefined,
+      phone: tags.phone || tags["contact:phone"] || undefined,
+      website: tags.website || tags["contact:website"] || undefined,
+      openingHours: tags.opening_hours || undefined,
+      // Izračunato iz zapisanog radnog vremena (null kad se ne može
+      // utvrditi). Dosad se popunjavalo samo iz Googleovog odgovora, pa su
+      // mjesta koja dolaze iz OpenStreetMapa uvijek bila "nepoznato".
+      openNow: isOpenAt(tags.opening_hours, new Date()),
+      rating: tags.stars ? parseFloat(tags.stars) : undefined,
+    });
   }
 
-  return answered ? [] : null;
-}
-
-// Najviše toliko Overpass upita istovremeno. Odabir doba dana pokreće ~5
-// kategorija odjednom; javni Overpass poslužitelji dopuštaju svega nekoliko
-// paralelnih upita po adresi i ostatak odbijaju (429/504), što se prije
-// pretvaralo u tihi prazan rezultat.
-const OVERPASS_CONCURRENCY = 3;
-
-async function mapWithLimit<T, R>(
-  items: T[],
-  limit: number,
-  fn: (item: T) => Promise<R>,
-): Promise<R[]> {
-  const out: R[] = new Array(items.length);
-  let next = 0;
-  const workers = Array.from(
-    { length: Math.min(limit, items.length) },
-    async () => {
-      while (next < items.length) {
-        const i = next++;
-        out[i] = await fn(items[i]);
-      }
-    },
-  );
-  await Promise.all(workers);
-  return out;
+  return results;
 }
 
 export interface PlacesResult {
@@ -1631,21 +1733,49 @@ export const getPlacesInRadius = async (
     .places;
 
 // ─── Glavna izvozna funkcija ──────────────────────────────────────────────────
-export const getPlacesInRadiusDetailed = async (
+const inflightPlaces = new Map<string, Promise<PlacesResult>>();
+
+export const getPlacesInRadiusDetailed = (
   latitude: number,
   longitude: number,
   radiusKm: number,
   types?: Place["type"][],
 ): Promise<PlacesResult> => {
-  if (!types || types.length === 0) return { places: [], failed: false };
+  if (!types || types.length === 0) {
+    return Promise.resolve({ places: [], failed: false });
+  }
 
   const radiusM = Math.round(radiusKm * 1000);
   const cacheKey = `${latitude.toFixed(3)},${longitude.toFixed(3)},${radiusM},${[...types].sort().join(",")}`;
 
   const cached = placesCache.get(cacheKey);
   if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-    return { places: cached.places, failed: false };
+    return Promise.resolve({ places: cached.places, failed: false });
   }
+
+  // Isti upit koji je već u tijeku (npr. dvostruki okidač) dijeli odgovor.
+  const running = inflightPlaces.get(cacheKey);
+  if (running) return running;
+
+  const promise = loadPlacesUncached(
+    latitude,
+    longitude,
+    radiusKm,
+    types,
+    cacheKey,
+  ).finally(() => inflightPlaces.delete(cacheKey));
+  inflightPlaces.set(cacheKey, promise);
+  return promise;
+};
+
+async function loadPlacesUncached(
+  latitude: number,
+  longitude: number,
+  radiusKm: number,
+  types: Place["type"][],
+  cacheKey: string,
+): Promise<PlacesResult> {
+  const radiusM = Math.round(radiusKm * 1000);
 
   // Blok smještajnih ključnih riječi za theater (koristi se na dva mjesta)
   const THEATER_BLOCK = [
@@ -1683,18 +1813,32 @@ export const getPlacesInRadiusDetailed = async (
 
   let failed = false;
 
-  const perType = await mapWithLimit(
-    types,
-    OVERPASS_CONCURRENCY,
-    async (type): Promise<Place[]> => {
-      const overpassRaw = await fetchFromOverpass(
-        latitude,
-        longitude,
-        radiusM,
-        type,
-      );
-      const overpassFailed = overpassRaw === null;
-      const overpassResults = overpassRaw ?? [];
+  const knownTypes = types.filter((t) => CATEGORY_RULES[t]);
+  const elements =
+    knownTypes.length > 0
+      ? await fetchOverpassForTypes(latitude, longitude, radiusM, knownTypes)
+      : [];
+  const overpassFailed = elements === null;
+  // Ako OSM nije odgovorio, popis je nepotpun: ne sprema se i korisnik može ponoviti.
+  if (overpassFailed) failed = true;
+  // Nominatim dopušta ~1 zahtjev u sekundi. Za mali broj kategorija služi kao
+  // dopuna rijetkim rezultatima; za veliki (plan putovanja) bi 10+ istodobnih
+  // zahtjeva bilo odbijeno i samo produljilo čekanje.
+  const useNominatim = types.length <= 3;
+
+  const perType = await Promise.all(
+    types.map(async (type): Promise<Place[]> => {
+      const rule = CATEGORY_RULES[type];
+      const overpassResults =
+        elements && rule
+          ? placesFromElements(
+              elements.filter((el) => elementMatchesRule(el, rule)),
+              latitude,
+              longitude,
+              radiusM,
+              type,
+            )
+          : [];
       const markFailedIfEmpty = (res: Place[]): Place[] => {
         if (overpassFailed && res.length === 0) failed = true;
         return res;
@@ -1710,7 +1854,7 @@ export const getPlacesInRadiusDetailed = async (
 
         // Nominatim fallback samo ako OSM nema dovoljno, ali s name filterom
         // jer Nominatim vraća gradove/regije za query "theatre"
-        if (filtered.length < 2) {
+        if (useNominatim && filtered.length < 2) {
           const nominatimResults = await fetchFromNominatim(
             latitude,
             longitude,
@@ -1743,7 +1887,7 @@ export const getPlacesInRadiusDetailed = async (
       }
 
       // Sve ostale kategorije — standardni Nominatim fallback
-      if (overpassResults.length < 3) {
+      if (useNominatim && overpassResults.length < 3) {
         const nominatimResults = await fetchFromNominatim(
           latitude,
           longitude,
@@ -1759,7 +1903,7 @@ export const getPlacesInRadiusDetailed = async (
         return markFailedIfEmpty([...overpassResults, ...extra]);
       }
       return overpassResults;
-    },
+    }),
   );
 
   let allPlaces = perType.flat();
@@ -1783,7 +1927,7 @@ export const getPlacesInRadiusDetailed = async (
     placesCache.set(cacheKey, { places: deduped, timestamp: Date.now() });
   }
   return { places: deduped, failed };
-};
+}
 
 // ─── Nominatim fallback po kategoriji ────────────────────────────────────────
 const NOMINATIM_CATEGORY_QUERIES: Record<string, string> = {
@@ -1825,7 +1969,7 @@ async function fetchFromNominatim(
     const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&viewbox=${bbox}&bounded=1&limit=15&addressdetails=1`;
 
     const ctrl = new AbortController();
-    const tid = setTimeout(() => ctrl.abort(), 10000);
+    const tid = setTimeout(() => ctrl.abort(), 6000);
     const res = await fetch(url, {
       headers: { "User-Agent": "CroMapApp/1.0" },
       signal: ctrl.signal,

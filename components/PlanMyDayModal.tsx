@@ -34,9 +34,8 @@ import { AreaActivitiesSheet } from "./AreaActivitiesSheet";
 import { API_BASE_URL } from "../app/config/api"; // prilagodi putanju
 
 import {
-  clearPlacesCache,
   geocodeCity,
-  getPlacesInRadius,
+  getPlacesInRadiusDetailed,
   Place,
   placeCategories,
 } from "../app/services/locationService";
@@ -794,17 +793,93 @@ function getTimeBasedActivities(
 // ---------------------------------------------------------------------------
 // fetchVenuesNearCity
 // ---------------------------------------------------------------------------
+interface DestinationSuggestion {
+  displayName: string;
+  lat: string;
+  lon: string;
+}
+
+/**
+ * Prijedlozi odredišta. Poslužitelj aplikacije je na besplatnom hostingu koji
+ * "zaspi" pa se budi pola minute — dotle polje za odredište vrti i plan se ne
+ * može pokrenuti (traži potvrđeno mjesto). Zato poslužitelj dobiva nekoliko
+ * sekundi, a potom se isti upit pita izravno OpenStreetMap geokoder.
+ */
+async function fetchDestinationSuggestions(
+  query: string,
+  token: string | null,
+): Promise<DestinationSuggestion[]> {
+  const q = query.trim();
+  const timed = async (
+    url: string,
+    init: RequestInit | undefined,
+    ms: number,
+  ) => {
+    const ctrl = new AbortController();
+    const id = setTimeout(() => ctrl.abort(), ms);
+    try {
+      return await fetch(url, { ...init, signal: ctrl.signal });
+    } finally {
+      clearTimeout(id);
+    }
+  };
+
+  try {
+    const res = await timed(
+      `${API_BASE_URL}/api/locationsearch/autocomplete?query=${encodeURIComponent(q)}`,
+      token ? { headers: { Authorization: `Bearer ${token}` } } : undefined,
+      3500,
+    );
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) return data;
+    }
+  } catch {
+    // poslužitelj spava ili je nedostupan — pada se na izravno geokodiranje
+  }
+
+  try {
+    const res = await timed(
+      `https://nominatim.openstreetmap.org/search?format=json&limit=5&q=${encodeURIComponent(q)}`,
+      { headers: { "User-Agent": "CroMapApp/1.0" } },
+      6000,
+    );
+    if (!res.ok) return [];
+    const data = await res.json();
+    if (!Array.isArray(data)) return [];
+    return data
+      .filter((d: any) => d.lat && d.lon && d.display_name)
+      .map((d: any) => ({
+        displayName: String(d.display_name)
+          .split(",")
+          .slice(0, 3)
+          .join(",")
+          .trim(),
+        lat: String(d.lat),
+        lon: String(d.lon),
+      }));
+  } catch {
+    return [];
+  }
+}
+
+/** Najdulje što korisnik čeka na plan; dulje od toga je bolja jasna greška i ponovni pokušaj. */
+const PLAN_FETCH_BUDGET_MS = 30000;
+
 async function fetchVenuesNearCity(
   cityQuery: string,
   radiusKm: number,
   interests: string[],
+  // Koordinate odabrane iz popisa prijedloga. Kad ih imamo, ne geokodira se
+  // ponovno: to je bio dodatni mrežni krug (i mjesto gdje je plan znao
+  // zakazati jer je upit "Zagreb, Hrvatska Hrvatska" Nominatimu nejasan).
+  known: { latitude: number; longitude: number; displayName: string } | null,
 ): Promise<{
   geocoded: { latitude: number; longitude: number; displayName: string } | null;
   venues: Record<string, VenueItem[]>;
 }> {
-  const geocoded = await geocodeCity(cityQuery);
+  const geocoded = known ?? (await geocodeCity(cityQuery));
   if (!geocoded) return { geocoded: null, venues: {} };
-  clearPlacesCache();
 
   const allCats = [
     "restaurant",
@@ -826,12 +901,15 @@ async function fetchVenuesNearCity(
     "paintball",
   ];
   const cats = interests.length > 0 ? interests : allCats;
-  const places = await getPlacesInRadius(
+  const { places, failed } = await getPlacesInRadiusDetailed(
     geocoded.latitude,
     geocoded.longitude,
     radiusKm,
     cats as any,
   );
+  // Izvor nije odgovorio, a nemamo ništa: to nije "grad bez mjesta", pa se
+  // korisniku kaže da pokuša ponovno umjesto da dobije prazan plan.
+  if (failed && places.length === 0) throw new Error("places-unavailable");
 
   const venues: Record<string, VenueItem[]> = {};
   for (const p of places) {
@@ -1288,6 +1366,11 @@ export function PlanMyDayModal({
   // prihvaćao bez ikakve provjere, pa je tipfeler u nazivu grada tiho
   // proizvodio prazan/pokvaren plan bez ijedne poruke greške.
   const [locationValid, setLocationValid] = useState(false);
+  const [destCoords, setDestCoords] = useState<{
+    latitude: number;
+    longitude: number;
+    displayName: string;
+  } | null>(null);
   const [locationSuggestions, setLocationSuggestions] = useState<
     { displayName: string; lat: string; lon: string }[]
   >([]);
@@ -1296,6 +1379,7 @@ export function PlanMyDayModal({
   const locationDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
+  const suggestSeqRef = useRef(0);
   const [numDays, setNumDays] = useState(1);
   const [planStyle, setPlanStyle] = useState<PlanStyle>("kulturno");
   const [spontaneous, setSpontaneous] = useState(false);
@@ -1374,6 +1458,12 @@ export function PlanMyDayModal({
     { icon: "", text: t("plan.loadingMsg4") },
     { icon: "", text: t("plan.loadingMsg5") },
   ];
+
+  // Budi poslužitelj čim se plan otvori: dok korisnik upisuje odredište, on se
+  // već diže, pa prvi upit ne dočeka hladan start.
+  useEffect(() => {
+    if (visible) fetch(API_BASE_URL, { method: "HEAD" }).catch(() => {});
+  }, [visible]);
 
   useEffect(() => {
     setLocalVisitedIds(new Set(visits.map((v) => v.placeId)));
@@ -1529,6 +1619,7 @@ export function PlanMyDayModal({
     setInterests([]);
     setSpontaneous(false);
     setDestination("");
+    setDestCoords(null);
     setNumDays(1);
     if (loadingInterval.current) clearInterval(loadingInterval.current);
   };
@@ -1604,6 +1695,7 @@ export function PlanMyDayModal({
   const searchDestination = (query: string) => {
     setDestination(query);
     setLocationValid(false);
+    setDestCoords(null);
 
     if (locationDebounceRef.current) clearTimeout(locationDebounceRef.current);
 
@@ -1614,28 +1706,36 @@ export function PlanMyDayModal({
     }
 
     locationDebounceRef.current = setTimeout(async () => {
+      const reqId = ++suggestSeqRef.current;
       setSearchingLocation(true);
       try {
         const token = await AsyncStorage.getItem("token");
-        const res = await fetch(
-          `${API_BASE_URL}/api/locationsearch/autocomplete?query=${encodeURIComponent(query.trim())}`,
-          token ? { headers: { Authorization: `Bearer ${token}` } } : undefined,
-        );
-        if (res.ok) {
-          const data = await res.json();
-          setLocationSuggestions(data);
-          setShowLocationSuggestions(data.length > 0);
-        }
+        const data = await fetchDestinationSuggestions(query, token);
+        // Sporiji odgovor na ranije slovo ne smije prebrisati noviji.
+        if (reqId !== suggestSeqRef.current) return;
+        setLocationSuggestions(data);
+        setShowLocationSuggestions(data.length > 0);
       } catch {
-        setLocationSuggestions([]);
+        if (reqId === suggestSeqRef.current) setLocationSuggestions([]);
       } finally {
-        setSearchingLocation(false);
+        if (reqId === suggestSeqRef.current) setSearchingLocation(false);
       }
     }, 400);
   };
 
-  const selectDestination = (suggestion: { displayName: string }) => {
+  const selectDestination = (suggestion: {
+    displayName: string;
+    lat?: string;
+    lon?: string;
+  }) => {
     setDestination(suggestion.displayName);
+    const lat = parseFloat(suggestion.lat ?? "");
+    const lon = parseFloat(suggestion.lon ?? "");
+    setDestCoords(
+      Number.isFinite(lat) && Number.isFinite(lon)
+        ? { latitude: lat, longitude: lon, displayName: suggestion.displayName }
+        : null,
+    );
     setLocationValid(true);
     setShowLocationSuggestions(false);
     setLocationSuggestions([]);
@@ -1660,11 +1760,23 @@ export function PlanMyDayModal({
 
     try {
       const query = [destination.trim(), "Hrvatska"].join(" ");
-      const { geocoded, venues } = await fetchVenuesNearCity(
-        query,
-        activityRadius ?? 5, // fallback na 5km ako nije odabrano
-        interests,
-      );
+      // Vremenski okvir: bez njega je plan uz spor izvor mogao "vrtjeti" i
+      // minutama, a korisnik ne zna čeka li još ili je pokvareno.
+      let budgetTimer: ReturnType<typeof setTimeout> | undefined;
+      const { geocoded, venues } = await Promise.race([
+        fetchVenuesNearCity(
+          query,
+          activityRadius ?? 5, // fallback na 5km ako nije odabrano
+          interests,
+          destCoords,
+        ),
+        new Promise<never>((_, reject) => {
+          budgetTimer = setTimeout(
+            () => reject(new Error("plan-timeout")),
+            PLAN_FETCH_BUDGET_MS,
+          );
+        }),
+      ]).finally(() => clearTimeout(budgetTimer));
 
       setAllVenues(venues);
       setGeocodedCoords(
@@ -1724,6 +1836,7 @@ export function PlanMyDayModal({
   }, [
     destination,
     locationValid,
+    destCoords,
     activityRadius,
     interests,
     spontaneous,
