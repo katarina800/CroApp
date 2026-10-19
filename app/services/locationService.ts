@@ -1440,7 +1440,7 @@ async function fetchFromOverpass(
   longitude: number,
   radiusM: number,
   type: string,
-): Promise<Place[]> {
+): Promise<Place[] | null> {
   const rule = CATEGORY_RULES[type];
   if (!rule) return [];
 
@@ -1463,6 +1463,12 @@ out body center;`;
     "https://overpass.openstreetmap.fr/api/interpreter",
   ];
 
+  // Poslužitelj je barem jednom uredno odgovorio. Razlikuje "nema takvih
+  // mjesta" (prazan, ali ispravan odgovor) od "upit nije uspio" (429/504/
+  // timeout) — prije su oba završavala kao [] i spremala se u cache, pa je
+  // jedan neuspio upit davao prazan prikaz idućih 5 minuta.
+  let answered = false;
+
   for (const endpoint of endpoints) {
     try {
       const ctrl = new AbortController();
@@ -1477,6 +1483,7 @@ out body center;`;
       if (!res.ok) continue;
 
       const data = await res.json();
+      answered = true;
       if (!data.elements?.length) continue;
 
       const results: Place[] = [];
@@ -1579,24 +1586,65 @@ out body center;`;
     }
   }
 
-  return [];
+  return answered ? [] : null;
 }
 
-// ─── Glavna izvozna funkcija ──────────────────────────────────────────────────
+// Najviše toliko Overpass upita istovremeno. Odabir doba dana pokreće ~5
+// kategorija odjednom; javni Overpass poslužitelji dopuštaju svega nekoliko
+// paralelnih upita po adresi i ostatak odbijaju (429/504), što se prije
+// pretvaralo u tihi prazan rezultat.
+const OVERPASS_CONCURRENCY = 3;
+
+async function mapWithLimit<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const out: R[] = new Array(items.length);
+  let next = 0;
+  const workers = Array.from(
+    { length: Math.min(limit, items.length) },
+    async () => {
+      while (next < items.length) {
+        const i = next++;
+        out[i] = await fn(items[i]);
+      }
+    },
+  );
+  await Promise.all(workers);
+  return out;
+}
+
+export interface PlacesResult {
+  places: Place[];
+  /** Neka kategorija nije dohvaćena (mreža/poslužitelj), pa lista može biti nepotpuna. */
+  failed: boolean;
+}
+
 export const getPlacesInRadius = async (
   latitude: number,
   longitude: number,
   radiusKm: number,
   types?: Place["type"][],
-): Promise<Place[]> => {
-  if (!types || types.length === 0) return [];
+): Promise<Place[]> =>
+  (await getPlacesInRadiusDetailed(latitude, longitude, radiusKm, types))
+    .places;
+
+// ─── Glavna izvozna funkcija ──────────────────────────────────────────────────
+export const getPlacesInRadiusDetailed = async (
+  latitude: number,
+  longitude: number,
+  radiusKm: number,
+  types?: Place["type"][],
+): Promise<PlacesResult> => {
+  if (!types || types.length === 0) return { places: [], failed: false };
 
   const radiusM = Math.round(radiusKm * 1000);
   const cacheKey = `${latitude.toFixed(3)},${longitude.toFixed(3)},${radiusM},${[...types].sort().join(",")}`;
 
   const cached = placesCache.get(cacheKey);
   if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-    return cached.places;
+    return { places: cached.places, failed: false };
   }
 
   // Blok smještajnih ključnih riječi za theater (koristi se na dva mjesta)
@@ -1633,77 +1681,88 @@ export const getPlacesInRadius = async (
     "nekretnin",
   ];
 
-  const promises = types.map(async (type): Promise<Place[]> => {
-    const overpassResults = await fetchFromOverpass(
-      latitude,
-      longitude,
-      radiusM,
-      type,
-    );
+  let failed = false;
 
-    if (type === "theater") {
-      // OSM amenity=theatre je dovoljan — ne trebamo name whitelist.
-      // Blokiramo samo očiti smještaj.
-      const filtered = overpassResults.filter((p) => {
-        const n = p.name.toLowerCase().trim();
-        return !THEATER_BLOCK.some((bad) => n.includes(bad));
-      });
+  const perType = await mapWithLimit(
+    types,
+    OVERPASS_CONCURRENCY,
+    async (type): Promise<Place[]> => {
+      const overpassRaw = await fetchFromOverpass(
+        latitude,
+        longitude,
+        radiusM,
+        type,
+      );
+      const overpassFailed = overpassRaw === null;
+      const overpassResults = overpassRaw ?? [];
+      const markFailedIfEmpty = (res: Place[]): Place[] => {
+        if (overpassFailed && res.length === 0) failed = true;
+        return res;
+      };
 
-      // Nominatim fallback samo ako OSM nema dovoljno, ali s name filterom
-      // jer Nominatim vraća gradove/regije za query "theatre"
-      if (filtered.length < 2) {
+      if (type === "theater") {
+        // OSM amenity=theatre je dovoljan — ne trebamo name whitelist.
+        // Blokiramo samo očiti smještaj.
+        const filtered = overpassResults.filter((p) => {
+          const n = p.name.toLowerCase().trim();
+          return !THEATER_BLOCK.some((bad) => n.includes(bad));
+        });
+
+        // Nominatim fallback samo ako OSM nema dovoljno, ali s name filterom
+        // jer Nominatim vraća gradove/regije za query "theatre"
+        if (filtered.length < 2) {
+          const nominatimResults = await fetchFromNominatim(
+            latitude,
+            longitude,
+            radiusKm,
+            type,
+          );
+          const validNominatim = nominatimResults.filter((p) => {
+            const n = p.name.toLowerCase().trim();
+            // WHITELIST: samo stvarna kazališta po imenu
+            const isRealTheater =
+              n.includes("kazalište") ||
+              n.includes("kazaliste") ||
+              n.includes("teatar") ||
+              n.includes("theatre") ||
+              n.includes("theater") ||
+              n.startsWith("hnk") ||
+              n.includes("dječje") ||
+              n.includes("narodno");
+            if (!isRealTheater) return false;
+            // BLACKLIST: ukloni smještaj
+            return !THEATER_BLOCK.some((bad) => n.includes(bad));
+          });
+          const existingIds = new Set(filtered.map((p) => p.id));
+          return markFailedIfEmpty([
+            ...filtered,
+            ...validNominatim.filter((p) => !existingIds.has(p.id)),
+          ]);
+        }
+        return markFailedIfEmpty(filtered);
+      }
+
+      // Sve ostale kategorije — standardni Nominatim fallback
+      if (overpassResults.length < 3) {
         const nominatimResults = await fetchFromNominatim(
           latitude,
           longitude,
           radiusKm,
           type,
         );
-        const validNominatim = nominatimResults.filter((p) => {
-          const n = p.name.toLowerCase().trim();
-          // WHITELIST: samo stvarna kazališta po imenu
-          const isRealTheater =
-            n.includes("kazalište") ||
-            n.includes("kazaliste") ||
-            n.includes("teatar") ||
-            n.includes("theatre") ||
-            n.includes("theater") ||
-            n.startsWith("hnk") ||
-            n.includes("dječje") ||
-            n.includes("narodno");
-          if (!isRealTheater) return false;
-          // BLACKLIST: ukloni smještaj
-          return !THEATER_BLOCK.some((bad) => n.includes(bad));
-        });
-        const existingIds = new Set(filtered.map((p) => p.id));
-        return [
-          ...filtered,
-          ...validNominatim.filter((p) => !existingIds.has(p.id)),
-        ];
+        const existingIds = new Set<string>(
+          overpassResults.map((p: Place) => p.id),
+        );
+        const extra = nominatimResults.filter(
+          (p: Place) => !existingIds.has(p.id),
+        );
+        return markFailedIfEmpty([...overpassResults, ...extra]);
       }
-      return filtered;
-    }
+      return overpassResults;
+    },
+  );
 
-    // Sve ostale kategorije — standardni Nominatim fallback
-    if (overpassResults.length < 3) {
-      const nominatimResults = await fetchFromNominatim(
-        latitude,
-        longitude,
-        radiusKm,
-        type,
-      );
-      const existingIds = new Set<string>(
-        overpassResults.map((p: Place) => p.id),
-      );
-      const extra = nominatimResults.filter(
-        (p: Place) => !existingIds.has(p.id),
-      );
-      return [...overpassResults, ...extra];
-    }
-    return overpassResults;
-  });
-
-  const results = await Promise.all(promises);
-  let allPlaces = results.flat();
+  let allPlaces = perType.flat();
 
   // Post-filter za theater — ukloni smještaj koji je možda ušao kroz Google
   // (street keyword provjera uklonjena — blokirala je legitimna kazališta)
@@ -1718,8 +1777,12 @@ export const getPlacesInRadius = async (
   const deduped = deduplicatePlaces(allPlaces);
   deduped.sort((a: Place, b: Place) => (a.distance ?? 0) - (b.distance ?? 0));
 
-  placesCache.set(cacheKey, { places: deduped, timestamp: Date.now() });
-  return deduped;
+  // Nepotpun rezultat se ne sprema: ponovni pokušaj mora ići na mrežu, a ne
+  // vratiti isti prazan prikaz iz cachea.
+  if (!failed) {
+    placesCache.set(cacheKey, { places: deduped, timestamp: Date.now() });
+  }
+  return { places: deduped, failed };
 };
 
 // ─── Nominatim fallback po kategoriji ────────────────────────────────────────
@@ -1819,6 +1882,7 @@ async function fetchFromNominatim(
 export default {
   searchPlaces,
   getPlacesInRadius,
+  getPlacesInRadiusDetailed,
   placeCategories,
   clearPlacesCache,
   geocodeCity,

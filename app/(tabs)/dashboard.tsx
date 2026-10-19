@@ -64,6 +64,7 @@ import {
   clearPlacesCache,
   geocodeCity,
   getPlacesInRadius,
+  getPlacesInRadiusDetailed,
   nameMatchesDenylist,
   Place,
   placeCategories,
@@ -9743,6 +9744,14 @@ export default function DashboardScreen() {
   // Broj koji se prikazuje na karti
   const [displayLimit, setDisplayLimit] = useState(INITIAL_RESULTS_LIMIT);
   const [isLoadingPlaces, setIsLoadingPlaces] = useState(false);
+  // Ishod zadnjeg dohvata: za koji je izbor i je li izvor zakazao. Bez toga
+  // se "još učitavam" i "nema ničega" ne mogu razlikovati — oba su bila 0/0.
+  const [lastLoad, setLastLoad] = useState<{
+    key: string;
+    failed: boolean;
+  } | null>(null);
+  // Redni broj zadnjeg zahtjeva; stariji odgovori koji stignu kasnije ignoriraju se.
+  const loadSeqRef = useRef(0);
   const [activeTimeOfDay, setActiveTimeOfDay] = useState<string | null>(null);
 
   const [todHint, setTodHint] = useState<string | null>(null);
@@ -9906,7 +9915,7 @@ export default function DashboardScreen() {
 
   const activeSearchLoc = searchLocation || userLocation;
 
-  // DODAJ novu helper funkciju (iznad timeFilteredPlaces):
+  // Helper za redoslijed po dobu dana (iznad timeFiltered):
   function isCategoryOpenInWindow(
     type: string,
     windowFrom: number,
@@ -9933,39 +9942,56 @@ export default function DashboardScreen() {
 
   // Filtriranje po dobu dana.
   //
-  // Ključna promjena: pita se "radi li ovo mjesto U ODABRANOM RAZDOBLJU",
-  // a ne "radi li baš sada". Prije se provjeravalo trenutno vrijeme, pa je
-  // odabir "navečer" u 14 h izbacivao svaki klub i kazalište — zbog čega je
-  // postojala i iznimka koja im je preskakala provjeru, a ta je onda
-  // propuštala i one koji uistinu ne rade. Sada iznimka nije potrebna.
+  // Pita se "radi li ovo mjesto U ODABRANOM RAZDOBLJU", a ne "radi li baš
+  // sada" — inače bi odabir "navečer" u 19:29 izbacio svaki klub i kazalište
+  // koji tek otvara.
   //
-  // Redoslijed izvora, od najpouzdanijeg: zapisano radno vrijeme →
-  // Googleov "otvoreno sada" (samo ako razdoblje obuhvaća sadašnji trenutak)
-  // → gruba procjena po kategoriji. Kad se ništa ne može utvrditi, mjesto
-  // OSTAJE vidljivo: bolje pokazati mjesto o kojem nemamo podatak nego
-  // sakriti nešto što radi.
-  const timeFilteredPlaces = useMemo(() => {
-    if (!activeTimeOfDay) return allPlaces;
+  // Skriva se SAMO mjesto za koje je radno vrijeme zapisano i kaže da je u tom
+  // razdoblju zatvoreno. Mjesto bez podatka ostaje vidljivo (označeno kao
+  // "nepotvrđeno") — prije ga je skrivala gruba tablica tipičnih sati po
+  // kategoriji, pa su kad god nitko nije imao zapisano radno vrijeme svi
+  // klubovi izlazili kao zatvoreni od nedjelje do srijede, a brojač je
+  // pokazivao 0/0. Ta se tablica sada koristi samo za redoslijed: potvrđeno
+  // otvorena mjesta idu prva, pa ona koja će vjerojatno biti otvorena.
+  const timeFiltered = useMemo(() => {
+    const none = new Set<string>();
+    if (!activeTimeOfDay) return { places: allPlaces, unconfirmed: none };
 
     const now = new Date();
     const nowH = now.getHours() + now.getMinutes() / 60;
     const dayOfWeek = now.getDay();
     const tod = TOD_HOURS[activeTimeOfDay];
-    if (!tod) return allPlaces;
+    if (!tod) return { places: allPlaces, unconfirmed: none };
 
     const windowIncludesNow = nowH >= tod.from && nowH < tod.to;
 
-    return allPlaces.filter((p) => {
+    const confirmed: Place[] = [];
+    const likely: Place[] = [];
+    const unlikely: Place[] = [];
+    const unconfirmed = new Set<string>();
+
+    for (const p of allPlaces) {
       const stated = isOpenDuringWindow(p.openingHours, now, tod.from, tod.to);
-      if (stated !== null) return stated;
+      if (stated === false) continue; // zapisano: u tom razdoblju ne radi
+      if (stated === true || (windowIncludesNow && p.openNow === true)) {
+        confirmed.push(p);
+        continue;
+      }
+      unconfirmed.add(p.id);
+      if (isCategoryOpenInWindow(p.type, tod.from, tod.to, dayOfWeek)) {
+        likely.push(p);
+      } else {
+        unlikely.push(p);
+      }
+    }
 
-      if (windowIncludesNow && p.openNow != null) return p.openNow;
-
-      return isCategoryOpenInWindow(p.type, tod.from, tod.to, dayOfWeek);
-    });
+    return {
+      places: [...confirmed, ...likely, ...unlikely],
+      unconfirmed,
+    };
   }, [allPlaces, activeTimeOfDay]);
 
-  const places = timeFilteredPlaces;
+  const places = timeFiltered.places;
 
   const initialRegion: Region = {
     latitude: 45.815,
@@ -10064,7 +10090,10 @@ export default function DashboardScreen() {
   // PRONAĐI useEffect koji resetira displayLimit:
   useEffect(() => {
     if (!activeSearchLoc || selectedTypes.length === 0 || showOnlyVisited) {
+      loadSeqRef.current++; // odbaci odgovor koji je možda još u letu
       setAllPlaces([]);
+      setLastLoad(null);
+      setIsLoadingPlaces(false);
       return;
     }
 
@@ -10308,6 +10337,9 @@ export default function DashboardScreen() {
 
   const loadPlacesInRadius = async () => {
     if (!activeSearchLoc || selectedTypes.length === 0) return;
+    const seq = ++loadSeqRef.current;
+    const loadKey = `${selectedTypes.join(",")}|${activeSearchLoc.latitude.toFixed(3)},${activeSearchLoc.longitude.toFixed(3)}|${radius}`;
+    let sourceFailed = false;
     setIsLoadingPlaces(true);
     try {
       // 1. Pokušaj Google Places Nearby Search (precizniji, ima McDonald's itd.)
@@ -10324,12 +10356,14 @@ export default function DashboardScreen() {
       }
 
       // 2. OSM Overpass kao dodatak/fallback
-      const osmPlaces = await getPlacesInRadius(
+      const osm = await getPlacesInRadiusDetailed(
         activeSearchLoc.latitude,
         activeSearchLoc.longitude,
         radius,
         selectedTypes as any,
       );
+      const osmPlaces = osm.places;
+      sourceFailed = osm.failed;
 
       // 3. Spoji oba izvora, dedupliciraj
       // 3. Spoji oba izvora, dedupliciraj (nova logika - po imenu + udaljenosti)
@@ -10735,8 +10769,12 @@ export default function DashboardScreen() {
         return CINEMA_WHITELIST.some((kw) => n.includes(kw));
       });
 
+      // Odgovor na stariji izbor ne smije pregaziti noviji.
+      if (seq !== loadSeqRef.current) return;
+
       cinemaFiltered.sort((a, b) => (a.distance ?? 0) - (b.distance ?? 0));
       setAllPlaces(cinemaFiltered); // ← landmarkExtra → cinemaFiltered
+      setLastLoad({ key: loadKey, failed: sourceFailed });
 
       if (finalFiltered.length > 0 && mapRef.current) {
         mapRef.current.fitToCoordinates(
@@ -10758,8 +10796,11 @@ export default function DashboardScreen() {
       }
     } catch (e) {
       console.error(e);
+      if (seq === loadSeqRef.current) {
+        setLastLoad({ key: loadKey, failed: true });
+      }
     } finally {
-      setIsLoadingPlaces(false);
+      if (seq === loadSeqRef.current) setIsLoadingPlaces(false);
     }
   };
 
@@ -10919,13 +10960,13 @@ export default function DashboardScreen() {
   const isVisited = (placeId: string) =>
     visits.some((v) => v.placeId === placeId);
   const ageFilteredPlaces = useMemo(() => {
-    let result = places; // places = timeFilteredPlaces, već filtriran po radnom vremenu
+    let result = places; // places = timeFiltered.places, već filtriran po radnom vremenu
 
     if (ageAllowedCats) {
       result = result.filter((p) => ageAllowedCats.includes(p.type));
     }
 
-    // ✅ FIX: uklonjena dupla provjera — timeFilteredPlaces to već radi
+    // ✅ FIX: uklonjena dupla provjera — timeFiltered to već radi
     // if (activeTimeOfDay) { result = result.filter(...) }  ← OBRIŠI OVO
 
     return result;
@@ -10975,6 +11016,20 @@ export default function DashboardScreen() {
 
   // Ima li još rezultata koji nisu prikazani
   const hasMore = totalFiltered > placesForMap.length;
+
+  // Je li dohvat za TRENUTNI izbor gotov, i kako je prošao. Samo tada smijemo
+  // reći "nema rezultata" — dok se još učitava, to bi bila laž.
+  const currentLoadKey = activeSearchLoc
+    ? `${selectedTypes.join(",")}|${activeSearchLoc.latitude.toFixed(3)},${activeSearchLoc.longitude.toFixed(3)}|${radius}`
+    : null;
+  const loadSettled =
+    !isLoadingPlaces && lastLoad !== null && lastLoad.key === currentLoadKey;
+  const loadFailed = loadSettled && lastLoad!.failed;
+  const nothingFound =
+    loadSettled &&
+    allPlaces.length === 0 &&
+    !showOnlyVisited &&
+    selectedTypes.length > 0;
 
   return (
     <View style={[s.container, { flex: 1, backgroundColor: "#1a2e1a" }]}>
@@ -12381,11 +12436,13 @@ export default function DashboardScreen() {
         onClose={() => setShowGroups(false)}
         userLocation={userLocation}
       />
-      {/* Info bar — broj rezultata + koliko je trenutno otvoreno */}
+      {/* Info bar — broj rezultata, a kad ih nema, ZAŠTO ih nema. */}
       {(isLoadingPlaces ||
         places.length > 0 ||
         activeTimeOfDay ||
-        showOnlyVisited) && (
+        showOnlyVisited ||
+        loadFailed ||
+        nothingFound) && (
         <View style={UI_STYLES.infoBar}>
           {isLoadingPlaces ? (
             <>
@@ -12393,52 +12450,135 @@ export default function DashboardScreen() {
               <Text style={UI_STYLES.infoBarText}>{t("map.loading")}...</Text>
             </>
           ) : (
-            <>
-              <Text style={UI_STYLES.infoBarText}>
-                {(() => {
-                  if (showOnlyVisited) {
-                    return t("map.visitedPlacesCount", {
-                      count: visits.length,
-                    });
-                  }
+            (() => {
+              if (showOnlyVisited) {
+                return (
+                  <Text style={UI_STYLES.infoBarText}>
+                    {t("map.visitedPlacesCount", { count: visits.length })}
+                  </Text>
+                );
+              }
 
-                  const shown = placesForMap.length;
-                  const total = focusedType
-                    ? ageFilteredPlaces.filter((p) => p.type === focusedType)
-                        .length
-                    : ageFilteredPlaces.length;
+              const shown = placesForMap.length;
+              const total = totalFiltered;
 
-                  const activeCatCount = selectedTypes.filter((type) =>
-                    ageFilteredPlaces.some((p) => p.type === type),
-                  ).length;
-
-                  const catLabel = focusedType
-                    ? t(`categories.${focusedType}`, {
-                        defaultValue: focusedType,
-                      })
-                    : activeCatCount > 1
-                      ? t("map.categoriesCount", { count: activeCatCount })
-                      : selectedTypes.length === 1
-                        ? t(`categories.${selectedTypes[0]}`, {
-                            defaultValue: selectedTypes[0],
-                          })
-                        : t("map.results");
-
-                  return `${shown}/${total} = ${catLabel}`;
-                })()}
-              </Text>
-              {hasMore && (
+              const retryBtn = (
                 <TouchableOpacity
                   style={UI_STYLES.infoShowMoreBtn}
-                  onPress={() => setDisplayLimit((prev) => prev + 20)}
+                  onPress={() => loadPlacesInRadius()}
                 >
                   <Text style={UI_STYLES.infoShowMoreText}>
-                    +{Math.min(totalFiltered - placesForMap.length, 20)}{" "}
-                    {t("common.more")}
+                    ↻ {t("map.retry")}
                   </Text>
                 </TouchableOpacity>
-              )}
-            </>
+              );
+
+              if (total === 0) {
+                // Sve što je pronađeno isključeno je zapisanim radnim vremenom.
+                if (activeTimeOfDay && allPlaces.length > 0) {
+                  return (
+                    <>
+                      <Text style={UI_STYLES.infoBarText}>
+                        {t("map.noneOpenInWindow")}
+                      </Text>
+                      <TouchableOpacity
+                        style={UI_STYLES.infoShowMoreBtn}
+                        onPress={() => setActiveTimeOfDay(null)}
+                      >
+                        <Text style={UI_STYLES.infoShowMoreText}>
+                          {t("map.showAllPlaces", { count: allPlaces.length })}
+                        </Text>
+                      </TouchableOpacity>
+                    </>
+                  );
+                }
+                if (loadFailed) {
+                  return (
+                    <>
+                      <Text style={UI_STYLES.infoBarText}>
+                        {t("map.loadFailed")}
+                      </Text>
+                      {retryBtn}
+                    </>
+                  );
+                }
+                return (
+                  <Text style={UI_STYLES.infoBarText}>
+                    {t("map.noResultsInRadius", { radius })}
+                  </Text>
+                );
+              }
+
+              const activeCatCount = selectedTypes.filter((type) =>
+                ageFilteredPlaces.some((p) => p.type === type),
+              ).length;
+
+              const catLabel = focusedType
+                ? t(`categories.${focusedType}`, { defaultValue: focusedType })
+                : activeCatCount > 1
+                  ? t("map.categoriesCount", { count: activeCatCount })
+                  : selectedTypes.length === 1
+                    ? t(`categories.${selectedTypes[0]}`, {
+                        defaultValue: selectedTypes[0],
+                      })
+                    : t("map.results");
+
+              const unconfirmedCount = activeTimeOfDay
+                ? ageFilteredPlaces.filter((p) =>
+                    timeFiltered.unconfirmed.has(p.id),
+                  ).length
+                : 0;
+
+              return (
+                <>
+                  <View style={{ flex: 1 }}>
+                    <Text style={UI_STYLES.infoBarText}>
+                      {t("map.shownOfTotal", { shown, total, label: catLabel })}
+                    </Text>
+                    {unconfirmedCount > 0 && (
+                      <Text
+                        style={[
+                          UI_STYLES.infoBarText,
+                          {
+                            fontSize: T.caption,
+                            opacity: 0.75,
+                            fontWeight: "400",
+                          },
+                        ]}
+                      >
+                        {t("map.unconfirmedHours", { count: unconfirmedCount })}
+                      </Text>
+                    )}
+                    {loadFailed && (
+                      <Text
+                        style={[
+                          UI_STYLES.infoBarText,
+                          {
+                            fontSize: T.caption,
+                            opacity: 0.75,
+                            fontWeight: "400",
+                          },
+                        ]}
+                      >
+                        {t("map.loadPartial")}
+                      </Text>
+                    )}
+                  </View>
+                  {loadFailed && retryBtn}
+                  {hasMore && (
+                    <TouchableOpacity
+                      style={UI_STYLES.infoShowMoreBtn}
+                      onPress={() => setDisplayLimit((prev) => prev + 20)}
+                    >
+                      <Text style={UI_STYLES.infoShowMoreText}>
+                        +{Math.min(totalFiltered - placesForMap.length, 20)}{" "}
+                        {t("common.more")}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </>
+              );
+            })()
           )}
         </View>
       )}
