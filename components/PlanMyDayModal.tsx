@@ -18,8 +18,8 @@ import {
   Animated,
   useWindowDimensions,
   Image,
-  ImageBackground,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   Platform,
   ScrollView,
@@ -192,8 +192,6 @@ const MARKER_IMAGES: Record<string, any> = {
   cave: require("../assets/images/spilja.png"),
   spa: require("../assets/images/toplica.png"),
 };
-
-const putnikIcon = require("../assets/images/putnik.png");
 
 // ---------------------------------------------------------------------------
 // Haversine
@@ -486,6 +484,33 @@ function travelMinutesBetween(
   );
   // ~5 min/km (pješice/kratka vožnja) + 5 min na parkiranje/orijentaciju.
   return Math.min(60, Math.max(5, Math.round(5 + km * 5)));
+}
+
+/**
+ * Odakle plan računa udaljenosti. Spontani plan ("zatekao sam se u gradu")
+ * kreće od korisnika, pa je prva postaja ona koja je NJEMU blizu — ne ona
+ * koja je blizu središta grada. Ako je korisnik daleko od odredišta (plan za
+ * drugi grad), polazi se od središta odredišta.
+ */
+function planStartFor(
+  spontaneous: boolean,
+  user: { latitude: number; longitude: number } | null,
+  geocoded: { latitude: number; longitude: number } | null,
+): { latitude: number; longitude: number } | null {
+  if (!geocoded) return user && spontaneous ? user : null;
+  if (
+    spontaneous &&
+    user &&
+    haversineKm(
+      user.latitude,
+      user.longitude,
+      geocoded.latitude,
+      geocoded.longitude,
+    ) <= 30
+  ) {
+    return { latitude: user.latitude, longitude: user.longitude };
+  }
+  return { latitude: geocoded.latitude, longitude: geocoded.longitude };
 }
 
 function getTimeBasedActivities(
@@ -852,40 +877,6 @@ function ProgressBar({ step, total }: { step: number; total: number }) {
   );
 }
 
-// ---------------------------------------------------------------------------
-// PulsingDot
-// ---------------------------------------------------------------------------
-function PulsingDot({ color }: { color: string }) {
-  const anim = useRef(new Animated.Value(1)).current;
-  useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(anim, {
-          toValue: 1.4,
-          duration: 700,
-          useNativeDriver: true,
-        }),
-        Animated.timing(anim, {
-          toValue: 1,
-          duration: 700,
-          useNativeDriver: true,
-        }),
-      ]),
-    ).start();
-  }, []);
-  return (
-    <Animated.View
-      style={{
-        width: 7,
-        height: 7,
-        borderRadius: 3.5,
-        backgroundColor: color,
-        transform: [{ scale: anim }],
-      }}
-    />
-  );
-}
-
 const InterestiGrid = React.memo(function InterestiGrid({
   interests,
   onToggle,
@@ -965,14 +956,240 @@ const InterestiGrid = React.memo(function InterestiGrid({
 });
 
 // ---------------------------------------------------------------------------
-// SimpleMarker - IKONE SE PRIKAZUJU ISPRAVNO
+// Put do mjesta: procjena vremena, smjer i otvaranje navigacije
 // ---------------------------------------------------------------------------
-// SimpleMarker - IKONE SE PRIKAZUJU ISPRAVNO
+type TravelMode = "walking" | "bicycling" | "driving" | "transit";
+
+const TRAVEL_MODES: TravelMode[] = [
+  "walking",
+  "bicycling",
+  "driving",
+  "transit",
+];
+
+const TRAVEL_MODE_ICON: Record<TravelMode, string> = {
+  walking: "🚶",
+  bicycling: "🚲",
+  driving: "🚗",
+  transit: "🚌",
+};
+
+/**
+ * Dalje od ovoga ne crtamo "ja → mjesto" na karti: tko planira put u drugi
+ * grad dobio bi kartu na kojoj se ne vidi ništa, pa se tada samo približi
+ * mjesto, a udaljenost ostaje napisana na kartici.
+ */
+const FAR_KM = 50;
+
+/** Izbor "Prijevoz" iz forme → način putovanja; null = nije odabrano. */
+function modeFromTransport(tr: TransportType | null): TravelMode | null {
+  switch (tr) {
+    case "auto":
+      return "driving";
+    case "javni":
+      return "transit";
+    case "pjesice":
+      return "walking";
+    case "bicikl":
+      return "bicycling";
+    default:
+      return null;
+  }
+}
+
+/** Kad korisnik nije odabrao prijevoz: pješice do ~1,5 km, inače vozilom. */
+function suggestMode(km: number | null): TravelMode {
+  return km === null || km <= 1.5 ? "walking" : "driving";
+}
+
+/**
+ * Grubo vrijeme putovanja iz zračne udaljenosti. Nije ruta, pa je uvijek
+ * prikazano s "~": cesta je dulja od pravca, a javni prijevoz ima čekanje.
+ */
+function estimateMinutes(km: number, mode: TravelMode): number {
+  let min: number;
+  switch (mode) {
+    case "walking":
+      min = ((km * 1.3) / 5) * 60;
+      break;
+    case "bicycling":
+      min = ((km * 1.3) / 15) * 60;
+      break;
+    case "driving":
+      min = 3 + ((km * 1.4) / 35) * 60;
+      break;
+    case "transit":
+      min = 8 + ((km * 1.4) / 20) * 60;
+      break;
+  }
+  return Math.max(1, Math.round(min));
+}
+
+function formatDistance(km: number): string {
+  if (km < 1) return `${Math.max(10, Math.round((km * 1000) / 10) * 10)} m`;
+  if (km < 100) return `${km.toFixed(1)} km`;
+  return `${Math.round(km)} km`;
+}
+
+function formatDuration(min: number): string {
+  if (min < 60) return `${min} min`;
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return m === 0 ? `${h} h` : `${h} h ${m} min`;
+}
+
+type CompassKey = "n" | "ne" | "e" | "se" | "s" | "sw" | "w" | "nw";
+
+/** Smjer iz točke `from` prema `to`, kao strana svijeta. */
+function compassDirection(
+  from: { latitude: number; longitude: number },
+  to: { latitude: number; longitude: number },
+): CompassKey {
+  const rad = Math.PI / 180;
+  const dLon = (to.longitude - from.longitude) * rad;
+  const y = Math.sin(dLon) * Math.cos(to.latitude * rad);
+  const x =
+    Math.cos(from.latitude * rad) * Math.sin(to.latitude * rad) -
+    Math.sin(from.latitude * rad) *
+      Math.cos(to.latitude * rad) *
+      Math.cos(dLon);
+  const deg = (Math.atan2(y, x) / rad + 360) % 360;
+  const keys: CompassKey[] = ["n", "ne", "e", "se", "s", "sw", "w", "nw"];
+  return keys[Math.round(deg / 45) % 8];
+}
+
+/**
+ * Otvara navigaciju do mjesta u aplikaciji karata na uređaju (polazište je
+ * trenutni položaj korisnika). Aplikacija sama nema usmjeravanje po ulicama;
+ * ovo je ono što korisniku zapravo treba kad stoji i pita "kako tamo?".
+ */
+function openDirections(
+  dest: { latitude: number; longitude: number },
+  mode: TravelMode,
+  onError: () => void,
+) {
+  const lat = dest.latitude.toFixed(6);
+  const lng = dest.longitude.toFixed(6);
+  const url =
+    Platform.OS === "ios"
+      ? `http://maps.apple.com/?daddr=${lat},${lng}&dirflg=${
+          mode === "transit" ? "r" : mode === "driving" ? "d" : "w"
+        }`
+      : `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=${mode}`;
+  Linking.openURL(url).catch(onError);
+}
+
+/** Čisti prikaz karte: bez država, pokrajina i tuđih poslovnih mjesta koji zaklanjaju naše oznake. */
+const PLAN_MAP_STYLE = [
+  {
+    featureType: "administrative.country",
+    elementType: "labels",
+    stylers: [{ visibility: "off" }],
+  },
+  {
+    featureType: "administrative.province",
+    elementType: "labels",
+    stylers: [{ visibility: "off" }],
+  },
+  { featureType: "poi.business", stylers: [{ visibility: "off" }] },
+  {
+    featureType: "transit",
+    elementType: "labels.icon",
+    stylers: [{ visibility: "off" }],
+  },
+];
+
+const mapPill = (isDark: boolean) =>
+  ({
+    backgroundColor: isDark ? "rgba(20,30,20,0.92)" : "rgba(255,255,255,0.95)",
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    shadowColor: "#000",
+    shadowOpacity: 0.18,
+    shadowRadius: 4,
+    elevation: 4,
+  }) as const;
+
+const mapPillText = (isDark: boolean) =>
+  ({
+    fontSize: T.meta,
+    fontWeight: "700",
+    color: isDark ? "#e8e8e8" : "#1a2a18",
+  }) as const;
+
+/**
+ * Oznake na karti sa slikom iz Viewa treba crtati "do kraja" prije nego što
+ * se prestane pratiti promjene (inače na Androidu ostanu prazne), a opet
+ * crtati kad se promijeni stanje (odabrano, posjećeno).
+ */
+function useBriefTracking(deps: unknown[]): boolean {
+  const [tracking, setTracking] = useState(true);
+  useEffect(() => {
+    setTracking(true);
+    const id = setTimeout(() => setTracking(false), 500);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, deps);
+  return tracking;
+}
+
 // ---------------------------------------------------------------------------
-// ---------------------------------------------------------------------------
-// SimpleMarker - IDENTIČAN PATTERN kao PlaceMarker u dashboard.tsx
+// Markeri na karti
 // ---------------------------------------------------------------------------
 
+/** Položaj korisnika: plava točka s haloom — uobičajena oznaka "ti si ovdje". */
+function UserMarker({
+  coordinate,
+}: {
+  coordinate: { latitude: number; longitude: number };
+}) {
+  const tracking = useBriefTracking([]);
+  return (
+    <Marker
+      coordinate={coordinate}
+      tracksViewChanges={tracking}
+      anchor={{ x: 0.5, y: 0.5 }}
+      zIndex={5}
+    >
+      <View
+        style={{
+          width: 44,
+          height: 44,
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <View
+          style={{
+            position: "absolute",
+            width: 44,
+            height: 44,
+            borderRadius: 22,
+            backgroundColor: "rgba(30,136,229,0.22)",
+          }}
+        />
+        <View
+          style={{
+            width: 18,
+            height: 18,
+            borderRadius: 9,
+            backgroundColor: "#1e88e5",
+            borderWidth: 3,
+            borderColor: "#fff",
+          }}
+        />
+      </View>
+    </Marker>
+  );
+}
+
+/**
+ * Postaja plana: obojani krug s REDNIM BROJEM. Boja je boja kategorije, a
+ * broj govori redoslijed — to dvoje se na karti mora čitati odmah, bez
+ * slika koje pri maloj veličini nitko ne razabire. Odabrana postaja je veća
+ * i ima prsten.
+ */
 function SimpleMarker({
   activity,
   color,
@@ -986,13 +1203,11 @@ function SimpleMarker({
   isCompleted: boolean;
   onPress: () => void;
 }) {
-  const [imageLoaded, setImageLoaded] = useState(false);
-
+  const tracking = useBriefTracking([isActive, isCompleted, color]);
   if (!activity.venue) return null;
 
-  const markerColor = isCompleted ? "#34c759" : color;
-  const iconSource = MARKER_IMAGES[activity.venueType];
-  const isFallback = activity.venueName.startsWith("Lokalni ");
+  const fill = isCompleted ? "#34c759" : color;
+  const size = isActive ? 38 : 28;
 
   return (
     <Marker
@@ -1000,121 +1215,53 @@ function SimpleMarker({
         latitude: activity.venue.latitude,
         longitude: activity.venue.longitude,
       }}
-      tracksViewChanges={!imageLoaded}
+      tracksViewChanges={tracking}
       onPress={onPress}
-      anchor={{ x: 0.5, y: 1 }}
+      anchor={{ x: 0.5, y: 0.5 }}
+      zIndex={isActive ? 10 : 1}
     >
       <View
         style={{
+          width: 48,
+          height: 48,
           alignItems: "center",
-          width: 60,
-          height: 74,
-          opacity: isFallback ? 0.55 : 1,
+          justifyContent: "center",
         }}
       >
-        {/* Broj badge */}
+        {isActive && (
+          <View
+            style={{
+              position: "absolute",
+              width: 48,
+              height: 48,
+              borderRadius: 24,
+              backgroundColor: fill,
+              opacity: 0.25,
+            }}
+          />
+        )}
         <View
           style={{
-            position: "absolute",
-            top: -4,
-            right: 2,
-            width: 20,
-            height: 20,
-            borderRadius: 10,
-            backgroundColor: markerColor,
-            justifyContent: "center",
-            alignItems: "center",
-            borderWidth: 2,
+            width: size,
+            height: size,
+            borderRadius: size / 2,
+            backgroundColor: fill,
+            borderWidth: isActive ? 3 : 2,
             borderColor: "#fff",
-            zIndex: 10,
-            elevation: 10,
+            alignItems: "center",
+            justifyContent: "center",
           }}
         >
-          <Text style={{ color: "#fff", fontSize: 9, fontWeight: "900" }}>
+          <Text
+            style={{
+              color: "#fff",
+              fontSize: isActive ? 16 : 13,
+              fontWeight: "900",
+            }}
+          >
             {isCompleted ? "✓" : activity.order + 1}
           </Text>
         </View>
-
-        {/* Ikona */}
-        {iconSource && !isFallback ? (
-          <ImageBackground
-            source={iconSource}
-            style={{
-              width: 50,
-              height: 50,
-              justifyContent: "center",
-              alignItems: "center",
-            }}
-            imageStyle={{
-              width: 50,
-              height: 50,
-              borderRadius: 25,
-              borderWidth: isActive ? 3 : 2.5,
-              borderColor: isCompleted
-                ? "#34c759"
-                : isActive
-                  ? "#fff"
-                  : markerColor,
-            }}
-            resizeMode="contain"
-            fadeDuration={0}
-            onLoad={() => setImageLoaded(true)}
-          >
-            <View
-              style={{
-                position: "absolute",
-                width: 50,
-                height: 50,
-                borderRadius: 25,
-                backgroundColor: markerColor,
-                opacity: isActive ? 0.35 : 0.2,
-              }}
-            />
-            {isActive && (
-              <View
-                style={{
-                  position: "absolute",
-                  width: 50,
-                  height: 50,
-                  borderRadius: 25,
-                  borderWidth: 3,
-                  borderColor: markerColor,
-                  opacity: 0.8,
-                }}
-              />
-            )}
-          </ImageBackground>
-        ) : (
-          // Fallback i emoji prikaz — uvijek funkcionira
-          <View
-            style={{
-              width: 50,
-              height: 50,
-              borderRadius: 25,
-              backgroundColor: isFallback ? "#888888" : markerColor,
-              justifyContent: "center",
-              alignItems: "center",
-              borderWidth: isActive ? 3 : 2.5,
-              borderColor: isActive ? "#fff" : isFallback ? "#aaaaaa" : "#fff",
-            }}
-          >
-            <Text style={{ fontSize: isActive ? 22 : 18 }}>
-              {EMOJIS[activity.venueType] || "📍"}
-            </Text>
-          </View>
-        )}
-
-        {/* Stem */}
-        <View
-          style={{
-            width: isActive ? 4 : 3,
-            height: 12,
-            backgroundColor: isFallback ? "#888888" : markerColor,
-            borderBottomLeftRadius: 3,
-            borderBottomRightRadius: 3,
-            marginTop: -2,
-          }}
-        />
       </View>
     </Marker>
   );
@@ -1209,8 +1356,16 @@ export function PlanMyDayModal({
     latitude: number;
     longitude: number;
     address?: string;
+    type?: string;
   } | null>(null);
   const [mapReady, setMapReady] = useState(false);
+  // Način putovanja do odabranog mjesta; null = nije odabran, pa se predlaže
+  // prema udaljenosti. Početna vrijednost dolazi iz izbora "Prijevoz" u formi.
+  const [navMode, setNavMode] = useState<TravelMode | null>(null);
+  // Položaj se čita preko refa da svaki GPS fix ne bi ponovno pomicao kameru
+  // dok korisnik razgledava kartu.
+  const userLocRef = useRef(userLocation);
+  userLocRef.current = userLocation;
 
   const LOADING_MESSAGES = [
     { icon: "", text: t("plan.loadingMsg1") },
@@ -1235,12 +1390,18 @@ export function PlanMyDayModal({
   const activeDayActivities: DayActivity[] = useMemo(() => {
     if (geocodedCoords && Object.keys(allVenues).length > 0) {
       const now = new Date();
-      return getTimeBasedActivities(allVenues, activeDay, geocodedCoords, t, {
-        spontaneous,
-        nowMinutes: now.getHours() * 60 + now.getMinutes(),
-        style: generatedStyle,
-        dayCount: generatedNumDays,
-      });
+      return getTimeBasedActivities(
+        allVenues,
+        activeDay,
+        planStartFor(spontaneous, userLocation, geocodedCoords),
+        t,
+        {
+          spontaneous,
+          nowMinutes: now.getHours() * 60 + now.getMinutes(),
+          style: generatedStyle,
+          dayCount: generatedNumDays,
+        },
+      );
     }
     return [];
   }, [
@@ -1251,45 +1412,98 @@ export function PlanMyDayModal({
     spontaneous,
     generatedStyle,
     generatedNumDays,
+    userLocation,
   ]);
 
-  // Auto-fit karte
-  useEffect(() => {
-    if (!mapRef.current || !mapReady || activeDayActivities.length === 0)
-      return;
-    const coords = activeDayActivities
-      .filter((a) => a.venue)
-      .map((a) => ({
-        latitude: a.venue!.latitude,
-        longitude: a.venue!.longitude,
-      }));
-    if (coords.length > 0) {
-      setTimeout(() => {
-        mapRef.current?.fitToCoordinates(coords, {
-          edgePadding: { top: 60, right: 60, bottom: 60, left: 60 },
-          animated: true,
-        });
-      }, 350);
-    }
-  }, [activeDayActivities, mapReady]);
+  /**
+   * Postavlja kameru tako da se vide I korisnik I odabrano mjesto — na temelju
+   * toga se bira kamo ići. Ako je korisnik predaleko (plan za drugi grad) ili
+   * nije poznat, kamera ide samo na mjesto. Za iznimno blizu mjesto ne radi
+   * se "fit" (zumirao bi do krova), nego se centrira između njih.
+   */
+  const focusOn = React.useCallback(
+    (target: { latitude: number; longitude: number }) => {
+      const map = mapRef.current;
+      if (!map) return;
+      const user = userLocRef.current;
+      const km = user
+        ? haversineKm(
+            user.latitude,
+            user.longitude,
+            target.latitude,
+            target.longitude,
+          )
+        : null;
 
-  // Auto-scroll na aktivni marker
-  useEffect(() => {
-    if (!mapRef.current || !mapReady) return;
-    const activity = activeDayActivities[activeStop];
-    if (!activity?.venue) return;
-    setTimeout(() => {
-      mapRef.current?.animateToRegion(
-        {
-          latitude: activity.venue!.latitude,
-          longitude: activity.venue!.longitude,
-          latitudeDelta: 0.015,
-          longitudeDelta: 0.015,
-        },
-        600,
+      if (user && km !== null && km <= FAR_KM) {
+        if (km < 0.25) {
+          map.animateToRegion(
+            {
+              latitude: (user.latitude + target.latitude) / 2,
+              longitude: (user.longitude + target.longitude) / 2,
+              latitudeDelta: 0.006,
+              longitudeDelta: 0.006,
+            },
+            500,
+          );
+        } else {
+          map.fitToCoordinates([user, target], {
+            edgePadding: { top: 70, right: 60, bottom: 70, left: 60 },
+            animated: true,
+          });
+        }
+        return;
+      }
+      map.animateToRegion(
+        { ...target, latitudeDelta: 0.015, longitudeDelta: 0.015 },
+        500,
       );
-    }, 300);
-  }, [activeStop, mapReady, activeDayActivities]);
+    },
+    [],
+  );
+
+  /** Cijeli dan na jednoj slici: sve postaje i korisnik (ako je blizu). */
+  const fitWholeDay = React.useCallback(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const coords: { latitude: number; longitude: number }[] =
+      activeDayActivities
+        .filter((a) => a.venue)
+        .map((a) => ({
+          latitude: a.venue!.latitude,
+          longitude: a.venue!.longitude,
+        }));
+    const user = userLocRef.current;
+    if (
+      user &&
+      coords.length > 0 &&
+      haversineKm(
+        user.latitude,
+        user.longitude,
+        coords[0].latitude,
+        coords[0].longitude,
+      ) <= FAR_KM
+    ) {
+      coords.push(user);
+    }
+    if (coords.length === 0) return;
+    map.fitToCoordinates(coords, {
+      edgePadding: { top: 70, right: 60, bottom: 70, left: 60 },
+      animated: true,
+    });
+  }, [activeDayActivities]);
+
+  // Kamera prati odabranu postaju (ili mjesto razgledano iz popisa). Prije su
+  // postojala dva efekta koja su istodobno pomicala kameru — jedan na sve
+  // postaje, drugi na jednu — pa je ishod ovisio o tome koji je zadnji stigao.
+  const focusTarget =
+    previewVenue ?? activeDayActivities[activeStop]?.venue ?? null;
+  useEffect(() => {
+    if (!mapReady || !focusTarget) return;
+    const id = setTimeout(() => focusOn(focusTarget), 250);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapReady, focusTarget?.latitude, focusTarget?.longitude, focusOn]);
 
   const reset = () => {
     setStep("form");
@@ -1300,6 +1514,8 @@ export function PlanMyDayModal({
     setActiveStop(0);
     setCompletedStops(new Set());
     setMapReady(false);
+    setPreviewVenue(null);
+    setNavMode(null);
     setExpandedCategories(new Set());
     setPlanRating(0);
     setRatingSubmitted(false);
@@ -1458,6 +1674,8 @@ export function PlanMyDayModal({
       );
       setGeneratedNumDays(spontaneous ? 1 : numDays);
       setGeneratedStyle(planStyle);
+      setPreviewVenue(null);
+      setNavMode(modeFromTransport(transport));
 
       if (loadingInterval.current) clearInterval(loadingInterval.current);
 
@@ -1468,9 +1686,7 @@ export function PlanMyDayModal({
         const activities = getTimeBasedActivities(
           venues,
           d,
-          geocoded
-            ? { latitude: geocoded.latitude, longitude: geocoded.longitude }
-            : null,
+          planStartFor(spontaneous, userLocation, geocoded),
           t,
           {
             // Spontani plan ("zatekao sam se u gradu") kreće od trenutnog
@@ -1512,6 +1728,9 @@ export function PlanMyDayModal({
     interests,
     spontaneous,
     numDays,
+    planStyle,
+    transport,
+    userLocation,
   ]);
 
   /**
@@ -1526,21 +1745,21 @@ export function PlanMyDayModal({
     latitude: number;
     longitude: number;
     address?: string;
+    type?: string;
   }) => {
     setPreviewVenue(venue);
     pageScrollRef.current?.scrollTo({ y: 0, animated: true });
+    focusOn(venue);
+  };
 
-    const target = { latitude: venue.latitude, longitude: venue.longitude };
-    if (userLocation) {
-      mapRef.current?.fitToCoordinates([userLocation, target], {
-        edgePadding: { top: 80, right: 80, bottom: 80, left: 80 },
-        animated: true,
-      });
-    } else {
-      mapRef.current?.animateToRegion(
-        { ...target, latitudeDelta: 0.01, longitudeDelta: 0.01 },
-        500,
-      );
+  /** Odaberi postaju plana: karta, kartica i popis prate isti odabir. */
+  const selectStop = (idx: number, opts?: { scrollToTop?: boolean }) => {
+    setPreviewVenue(null);
+    setActiveStop(idx);
+    const venue = activeDayActivities[idx]?.venue;
+    if (venue) focusOn(venue);
+    if (opts?.scrollToTop) {
+      pageScrollRef.current?.scrollTo({ y: 0, animated: true });
     }
   };
 
@@ -1613,6 +1832,631 @@ export function PlanMyDayModal({
       </Modal>
     );
   }
+
+  // ---------------------------------------------------------------------------
+  // Kartica odabrane postaje: što je, koliko je daleko, kako tamo, i gumb
+  // "Navigiraj". Sve što je prije bilo razbacano po traci iznad karte,
+  // natpisu preko karte i redu popisa sada je na jednom mjestu.
+  // ---------------------------------------------------------------------------
+  const renderStopCard = () => {
+    const activity = activeDayActivities[activeStop] ?? null;
+    const isPreview = previewVenue !== null;
+    const venue = isPreview ? previewVenue : (activity?.venue ?? null);
+    if (!venue) return null;
+
+    const type = isPreview ? previewVenue.type : activity?.venueType;
+    const cat = type
+      ? placeCategories[type as keyof typeof placeCategories]
+      : undefined;
+    const routeColor = ROUTE_COLORS[activeDay % ROUTE_COLORS.length];
+    const color = cat?.color ?? routeColor;
+    const total = activeDayActivities.length;
+
+    const km = userLocation
+      ? haversineKm(
+          userLocation.latitude,
+          userLocation.longitude,
+          venue.latitude,
+          venue.longitude,
+        )
+      : null;
+    const far = km !== null && km > FAR_KM;
+    const mode = navMode ?? suggestMode(km);
+
+    const visited = type ? isVenueVisited(venue, type) : false;
+    const done = isPreview
+      ? visited
+      : completedStops.has(activeStop) || visited;
+
+    const tips: string[] = [];
+    if (km === null || !userLocation) {
+      tips.push(t("plan.tipNoLocation"));
+    } else if (km < 0.15) {
+      tips.push(t("plan.tipHere"));
+    } else if (far) {
+      tips.push(t("plan.tipFar", { dist: formatDistance(km) }));
+    } else {
+      tips.push(
+        t("plan.tipDirection", {
+          dir: t(`plan.compass.${compassDirection(userLocation, venue)}`),
+          dist: formatDistance(km),
+        }),
+      );
+      tips.push(t(`plan.tipMode_${suggestMode(km)}`));
+    }
+    if (mode === "transit" && km !== null && km >= 0.15 && !far) {
+      const hour = activity ? parseInt(activity.time.slice(0, 2), 10) : 0;
+      if (type === "club" || hour >= 21) tips.push(t("plan.tipLateTransit"));
+    }
+
+    const openDetail = () => {
+      if (!isPreview && activity) {
+        openVenueDetail(activity);
+        return;
+      }
+      setSelectedPlace({
+        id: `plan_${type ?? "landmark"}_${venue.name}`,
+        name: venue.name,
+        latitude: venue.latitude,
+        longitude: venue.longitude,
+        type: (type ?? "landmark") as Place["type"],
+        address: venue.address,
+      });
+      setShowDetailModal(true);
+    };
+
+    const markDone = async () => {
+      await handleMarkVisited(venue, type ?? "landmark");
+      if (!isPreview) {
+        setCompletedStops((prev) => new Set([...prev, activeStop]));
+        if (activeStop + 1 < total) selectStop(activeStop + 1);
+      }
+    };
+
+    const stepBtn = (label: string, disabled: boolean, onPress: () => void) => (
+      <TouchableOpacity
+        onPress={onPress}
+        disabled={disabled}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        style={{
+          width: 30,
+          height: 30,
+          borderRadius: 15,
+          borderWidth: 1,
+          borderColor: DC.border,
+          alignItems: "center",
+          justifyContent: "center",
+          opacity: disabled ? 0.35 : 1,
+        }}
+      >
+        <Text style={{ color: DC.text, fontSize: T.body, fontWeight: "800" }}>
+          {label}
+        </Text>
+      </TouchableOpacity>
+    );
+
+    return (
+      <View
+        style={{
+          marginHorizontal: 16,
+          marginTop: 12,
+          backgroundColor: DC.card,
+          borderRadius: 16,
+          borderWidth: 1,
+          borderColor: DC.borderDim,
+          padding: 14,
+        }}
+      >
+        {/* Zaglavlje: gdje smo u planu */}
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            marginBottom: 10,
+          }}
+        >
+          <Text
+            style={{
+              flex: 1,
+              fontSize: T.caption,
+              fontWeight: "800",
+              color: DC.textDim,
+              textTransform: "uppercase",
+              letterSpacing: 0.6,
+            }}
+          >
+            {isPreview
+              ? t("plan.previewLabel")
+              : total > 1
+                ? t("plan.stopOf", { current: activeStop + 1, total })
+                : t("plan.yourStop")}
+          </Text>
+          {isPreview ? (
+            <TouchableOpacity
+              onPress={() => selectStop(activeStop)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Text
+                style={{
+                  color: DC.accent,
+                  fontSize: T.meta,
+                  fontWeight: "700",
+                }}
+              >
+                ✕ {t("plan.backToPlan")}
+              </Text>
+            </TouchableOpacity>
+          ) : (
+            total > 1 && (
+              <View style={{ flexDirection: "row", gap: 8 }}>
+                {stepBtn("‹", activeStop === 0, () =>
+                  selectStop(activeStop - 1),
+                )}
+                {stepBtn("›", activeStop >= total - 1, () =>
+                  selectStop(activeStop + 1),
+                )}
+              </View>
+            )
+          )}
+        </View>
+
+        {/* Naziv */}
+        <View
+          style={{ flexDirection: "row", alignItems: "flex-start", gap: 12 }}
+        >
+          <View
+            style={{
+              width: 44,
+              height: 44,
+              borderRadius: 22,
+              backgroundColor: color + "22",
+              borderWidth: 2,
+              borderColor: color,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Text style={{ fontSize: 20 }}>
+              {(type && EMOJIS[type]) || "📍"}
+            </Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text
+              style={{ fontSize: T.lead, fontWeight: "800", color: DC.text }}
+              numberOfLines={2}
+            >
+              {venue.name}
+            </Text>
+            {!isPreview && activity && (
+              <Text
+                style={{ fontSize: T.meta, color: DC.textSub, marginTop: 2 }}
+                numberOfLines={2}
+              >
+                {activity.description}
+              </Text>
+            )}
+            {venue.address ? (
+              <Text
+                style={{ fontSize: T.caption, color: DC.textDim, marginTop: 2 }}
+                numberOfLines={1}
+              >
+                📍 {venue.address}
+              </Text>
+            ) : null}
+          </View>
+          {!isPreview && activity && (
+            <Text
+              style={{ fontSize: T.lead, fontWeight: "800", color: routeColor }}
+            >
+              {activity.time}
+            </Text>
+          )}
+        </View>
+
+        {/* Trajanje i cijena */}
+        {!isPreview && activity && (
+          <Text style={{ fontSize: T.meta, color: DC.textSub, marginTop: 10 }}>
+            ⏱ {formatDuration(activity.duration)} · 💶 ~{activity.cost} EUR
+          </Text>
+        )}
+
+        {/* Kako tamo */}
+        <View
+          style={{
+            marginTop: 12,
+            padding: 10,
+            borderRadius: 12,
+            backgroundColor: DC.bg,
+            gap: 8,
+          }}
+        >
+          {km !== null && (
+            <Text
+              style={{ fontSize: T.meta, fontWeight: "800", color: DC.text }}
+            >
+              📍 {formatDistance(km)} {t("plan.fromYou")}
+            </Text>
+          )}
+          <View style={{ flexDirection: "row", gap: 6 }}>
+            {TRAVEL_MODES.map((m) => {
+              const selected = m === mode;
+              return (
+                <TouchableOpacity
+                  key={m}
+                  onPress={() => setNavMode(m)}
+                  accessibilityRole="button"
+                  accessibilityLabel={t(`plan.mode.${m}`)}
+                  style={{
+                    flex: 1,
+                    paddingVertical: 7,
+                    borderRadius: 10,
+                    borderWidth: 1.5,
+                    borderColor: selected ? DC.accent : DC.borderDim,
+                    backgroundColor: selected
+                      ? DC.accent + "28"
+                      : "transparent",
+                    alignItems: "center",
+                  }}
+                >
+                  <Text style={{ fontSize: T.body }}>
+                    {TRAVEL_MODE_ICON[m]}
+                  </Text>
+                  {km !== null && !far && (
+                    <Text
+                      style={{
+                        fontSize: T.caption,
+                        color: selected ? DC.text : DC.textDim,
+                        fontWeight: selected ? "800" : "500",
+                      }}
+                      numberOfLines={1}
+                    >
+                      ~{formatDuration(estimateMinutes(km, m))}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          {tips.map((tip, i) => (
+            <Text
+              key={i}
+              style={{
+                fontSize: T.caption + 1,
+                color: DC.textSub,
+                lineHeight: 16,
+              }}
+            >
+              {i === 0 ? "💡 " : "• "}
+              {tip}
+            </Text>
+          ))}
+        </View>
+
+        {/* Akcije */}
+        <TouchableOpacity
+          onPress={() =>
+            openDirections(venue, mode, () =>
+              Alert.alert(t("common.error"), t("plan.navError")),
+            )
+          }
+          style={{
+            marginTop: 12,
+            backgroundColor: DC.accent,
+            borderRadius: 12,
+            paddingVertical: 14,
+            alignItems: "center",
+          }}
+        >
+          <Text style={{ color: "#fff", fontSize: T.body, fontWeight: "800" }}>
+            🧭 {t("plan.navigate")}
+          </Text>
+        </TouchableOpacity>
+        <View style={{ flexDirection: "row", gap: 8, marginTop: 8 }}>
+          <TouchableOpacity
+            onPress={openDetail}
+            style={{
+              flex: 1,
+              paddingVertical: 11,
+              borderRadius: 12,
+              borderWidth: 1,
+              borderColor: DC.border,
+              alignItems: "center",
+            }}
+          >
+            <Text
+              style={{ color: DC.text, fontSize: T.meta, fontWeight: "700" }}
+            >
+              {t("plan.details")}
+            </Text>
+          </TouchableOpacity>
+          {done ? (
+            <View
+              style={{
+                flex: 1,
+                paddingVertical: 11,
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: "#34c759",
+                backgroundColor: "#34c75922",
+                alignItems: "center",
+              }}
+            >
+              <Text
+                style={{
+                  color: "#34c759",
+                  fontSize: T.meta,
+                  fontWeight: "800",
+                }}
+              >
+                ✓ {t("plan.visitedDone")}
+              </Text>
+            </View>
+          ) : (
+            <TouchableOpacity
+              onPress={markDone}
+              style={{
+                flex: 1,
+                paddingVertical: 11,
+                borderRadius: 12,
+                backgroundColor: "#34c759",
+                alignItems: "center",
+              }}
+            >
+              <Text
+                style={{ color: "#fff", fontSize: T.meta, fontWeight: "800" }}
+              >
+                {t("plan.visitedMark")} ✓
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+    );
+  };
+
+  // ---------------------------------------------------------------------------
+  // Vremenska crta dana: vrijeme | točka na tračnici | naziv i jedan redak
+  // podataka. Put između postaja je spojnica na tračnici, ne zaseban tekst.
+  // ---------------------------------------------------------------------------
+  const renderTimeline = () => {
+    const total = activeDayActivities.length;
+    if (total <= 1) return null; // jedna postaja = kartica iznad je cijeli plan
+
+    const routeColor = ROUTE_COLORS[activeDay % ROUTE_COLORS.length];
+    const firstVenue = activeDayActivities[0]?.venue ?? null;
+    const showYou =
+      !!userLocation &&
+      !!firstVenue &&
+      haversineKm(
+        userLocation.latitude,
+        userLocation.longitude,
+        firstVenue.latitude,
+        firstVenue.longitude,
+      ) <= FAR_KM;
+
+    const rail = (opts: {
+      lineTop: boolean;
+      lineBottom: boolean;
+      dot?: React.ReactNode;
+    }) => (
+      <View
+        style={{
+          width: 28,
+          alignItems: "center",
+          justifyContent: "center",
+          alignSelf: "stretch",
+        }}
+      >
+        {(opts.lineTop || opts.lineBottom) && (
+          <View
+            style={{
+              position: "absolute",
+              width: 2,
+              backgroundColor: DC.border,
+              top: opts.lineTop ? 0 : "50%",
+              bottom: opts.lineBottom ? 0 : "50%",
+            }}
+          />
+        )}
+        {opts.dot}
+      </View>
+    );
+
+    /** Put između dviju točaka: ikona načina putovanja i procjena. */
+    const connector = (
+      key: string,
+      from: { latitude: number; longitude: number },
+      to: { latitude: number; longitude: number },
+    ) => {
+      const km = haversineKm(
+        from.latitude,
+        from.longitude,
+        to.latitude,
+        to.longitude,
+      );
+      const m = navMode ?? suggestMode(km);
+      return (
+        <View key={key} style={{ flexDirection: "row", alignItems: "center" }}>
+          <View style={{ width: 46 }} />
+          {rail({ lineTop: true, lineBottom: true })}
+          <Text
+            style={{
+              fontSize: T.caption,
+              color: DC.textDim,
+              paddingVertical: 4,
+              paddingLeft: 10,
+            }}
+          >
+            {TRAVEL_MODE_ICON[m]} ~{formatDuration(estimateMinutes(km, m))} ·{" "}
+            {formatDistance(km)}
+          </Text>
+        </View>
+      );
+    };
+
+    return (
+      <View style={{ marginHorizontal: 16, marginTop: 16, marginBottom: 4 }}>
+        <Text
+          style={{
+            fontSize: T.meta,
+            fontWeight: "700",
+            color: DC.textSub,
+            textTransform: "uppercase",
+            letterSpacing: 0.5,
+            marginBottom: 8,
+          }}
+        >
+          {generatedNumDays > 1
+            ? t("plan.dayPlanLabel", { day: activeDay + 1 })
+            : t("plan.hourlyPlan")}
+        </Text>
+        <View
+          style={{
+            backgroundColor: DC.card,
+            borderRadius: 16,
+            paddingVertical: 8,
+            paddingHorizontal: 10,
+            borderWidth: 1,
+            borderColor: DC.borderDim,
+          }}
+        >
+          {showYou && userLocation && firstVenue && (
+            <>
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <View style={{ width: 46 }} />
+                {rail({
+                  lineTop: false,
+                  lineBottom: true,
+                  dot: (
+                    <View
+                      style={{
+                        width: 14,
+                        height: 14,
+                        borderRadius: 7,
+                        backgroundColor: "#1e88e5",
+                        borderWidth: 2.5,
+                        borderColor: "#fff",
+                      }}
+                    />
+                  ),
+                })}
+                <Text
+                  style={{
+                    fontSize: T.meta,
+                    fontWeight: "700",
+                    color: DC.text,
+                    paddingVertical: 8,
+                    paddingLeft: 10,
+                  }}
+                >
+                  {t("plan.youAreHere")}
+                </Text>
+              </View>
+              {connector("c_you", userLocation, firstVenue)}
+            </>
+          )}
+          {activeDayActivities.map((activity, idx) => {
+            const isActive = !previewVenue && activeStop === idx;
+            const venueVisited = activity.venue
+              ? isVenueVisited(activity.venue, activity.venueType)
+              : false;
+            const isDone = completedStops.has(idx) || venueVisited;
+            const catColor =
+              placeCategories[
+                activity.venueType as keyof typeof placeCategories
+              ]?.color ?? routeColor;
+            const prev = idx > 0 ? activeDayActivities[idx - 1].venue : null;
+
+            return (
+              <React.Fragment key={`tl_${idx}`}>
+                {idx > 0 &&
+                  prev &&
+                  activity.venue &&
+                  connector(`c_${idx}`, prev, activity.venue)}
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  disabled={!activity.venue}
+                  onPress={() => selectStop(idx, { scrollToTop: true })}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "stretch",
+                    borderRadius: 10,
+                    backgroundColor: isActive ? catColor + "1c" : "transparent",
+                  }}
+                >
+                  <View style={{ width: 46, justifyContent: "center" }}>
+                    <Text
+                      style={{
+                        fontSize: T.meta,
+                        fontWeight: "800",
+                        color: isActive ? DC.text : DC.textSub,
+                      }}
+                    >
+                      {activity.time}
+                    </Text>
+                  </View>
+                  {rail({
+                    lineTop: idx > 0 || showYou,
+                    lineBottom: idx < total - 1,
+                    dot: (
+                      <View
+                        style={{
+                          width: 24,
+                          height: 24,
+                          borderRadius: 12,
+                          backgroundColor: isDone ? "#34c759" : catColor,
+                          borderWidth: isActive ? 3 : 0,
+                          borderColor: "#fff",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        <Text
+                          style={{
+                            color: "#fff",
+                            fontSize: 11,
+                            fontWeight: "900",
+                          }}
+                        >
+                          {isDone ? "✓" : idx + 1}
+                        </Text>
+                      </View>
+                    ),
+                  })}
+                  <View
+                    style={{ flex: 1, paddingVertical: 10, paddingLeft: 10 }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: T.meta,
+                        fontWeight: "700",
+                        color: isDone ? "#34c759" : DC.text,
+                      }}
+                      numberOfLines={2}
+                    >
+                      {activity.venueName}
+                    </Text>
+                    <Text
+                      style={{
+                        fontSize: T.caption,
+                        color: DC.textDim,
+                        marginTop: 2,
+                      }}
+                      numberOfLines={2}
+                    >
+                      {EMOJIS[activity.venueType] || "📍"}{" "}
+                      {activity.description} ·{" "}
+                      {formatDuration(activity.duration)} · ~{activity.cost} EUR
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              </React.Fragment>
+            );
+          })}
+        </View>
+      </View>
+    );
+  };
 
   // ---------------------------------------------------------------------------
   // Render — RESULT
@@ -2474,568 +3318,200 @@ export function PlanMyDayModal({
               ))}
             </View>
             {geocodedCoords && activeDayActivities.length > 0 && (
-              <View style={{ margin: 16, borderRadius: 16 }}>
-                {/* AKTIVAN STOP BANNER — overlay iznad karte */}
-                {activeDayActivities[activeStop] && (
-                  <View
-                    style={{
-                      position: "absolute",
-                      top: 12,
-                      left: 12,
-                      right: 12,
-                      zIndex: 10,
-                      backgroundColor: isDark
-                        ? "rgba(20,30,20,0.95)"
-                        : "rgba(255,255,255,0.95)",
-                      borderRadius: 12,
-                      padding: 10,
-                      flexDirection: "row",
-                      alignItems: "center",
-                      gap: 10,
-                      shadowColor: "#000",
-                      shadowOpacity: 0.15,
-                      shadowRadius: 8,
-                      elevation: 6,
-                    }}
-                  >
-                    <View
-                      style={{
-                        width: 28,
-                        height: 28,
-                        borderRadius: 14,
-                        backgroundColor:
-                          ROUTE_COLORS[activeDay % ROUTE_COLORS.length],
-                        justifyContent: "center",
-                        alignItems: "center",
-                      }}
-                    >
-                      <Text
-                        style={{
-                          color: "#fff",
-                          fontSize: T.meta,
-                          fontWeight: "700",
-                        }}
-                      >
-                        {activeStop + 1}
-                      </Text>
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text
-                        style={{
-                          fontSize: T.meta,
-                          fontWeight: "700",
-                          color: DC.text,
-                        }}
-                        numberOfLines={1}
-                      >
-                        {activeDayActivities[activeStop].venueName}{" "}
-                      </Text>
-                      {/* Vrijeme puta od prethodne postaje. Plan bira mjesta
-                          po blizini i to je oduvijek racunao — ali dosad nije
-                          pokazivao, pa korisnik nije imao po cemu prosuditi
-                          je li redoslijed smislen ili nasumican. */}
-                      <Text style={{ fontSize: T.caption, color: DC.textSub }}>
-                        {activeDayActivities[activeStop].description}
-                        {" • "}
-                        {activeDayActivities[activeStop].duration} min
-                        {" • "}
-                        {activeStop === 0 ||
-                        !activeDayActivities[activeStop].travelMinutes
-                          ? t("plan.firstStop")
-                          : t("plan.travelFromPrevious", {
-                              min: activeDayActivities[activeStop]
-                                .travelMinutes,
-                            })}
-                      </Text>
-                    </View>
-                    <Text
-                      style={{
-                        fontSize: T.meta,
-                        fontWeight: "700",
-                        color: ROUTE_COLORS[activeDay % ROUTE_COLORS.length],
-                      }}
-                    >
-                      {activeDayActivities[activeStop].time}
-                    </Text>
-                  </View>
-                )}
-                <MapView
-                  ref={mapRef}
-                  style={{ height: 380 }}
-                  initialRegion={{
-                    latitude: geocodedCoords.latitude,
-                    longitude: geocodedCoords.longitude,
-                    latitudeDelta: 0.02,
-                    longitudeDelta: 0.02,
-                  }}
-                  onMapReady={() => setMapReady(true)}
-                  toolbarEnabled={false} // ← uklanja Google Maps toolbar s ikonama
-                  moveOnMarkerPress={false}
-                >
-                  {userLocation && (
-                    <Marker
-                      coordinate={userLocation}
-                      tracksViewChanges={false}
-                      anchor={{ x: 0.5, y: 0.5 }}
-                    >
-                      <Image
-                        source={putnikIcon}
-                        style={{ width: 48, height: 48 }}
-                        resizeMode="contain"
-                        fadeDuration={0}
-                      />
-                    </Marker>
-                  )}
-
-                  {(() => {
-                    const color = ROUTE_COLORS[activeDay % ROUTE_COLORS.length];
-                    const routeCoords = [
-                      ...(userLocation ? [userLocation] : [geocodedCoords]),
-                      ...activeDayActivities
-                        .filter((a) => a.venue)
-                        .map((a) => ({
-                          latitude: a.venue!.latitude,
-                          longitude: a.venue!.longitude,
-                        })),
-                    ];
-                    const validCoords = routeCoords.filter(
-                      (c) =>
-                        c &&
-                        typeof c.latitude === "number" &&
-                        typeof c.longitude === "number",
-                    );
-
-                    return (
-                      <>
-                        {validCoords.length > 1 && (
-                          <Polyline
-                            coordinates={validCoords}
-                            strokeColor={color}
-                            strokeWidth={4}
-                          />
-                        )}
-                        {activeDayActivities.map((activity, idx) => (
-                          <SimpleMarker
-                            key={`marker_${idx}`}
-                            activity={activity}
-                            color={color}
-                            isActive={
-                              activeStop === idx && activity.venue !== null
-                            }
-                            isCompleted={completedStops.has(idx)}
-                            onPress={() => {
-                              if (activity.venue) {
-                                setActiveStop(idx);
-                                openVenueDetail(activity);
-                              }
-                            }}
-                          />
-                        ))}
-                      </>
-                    );
-                  })()}
-
-                  {/* Mjesto koje korisnik upravo razgledava iz popisa. */}
-                  {previewVenue && (
-                    <Marker
-                      coordinate={{
-                        latitude: previewVenue.latitude,
-                        longitude: previewVenue.longitude,
-                      }}
-                      title={previewVenue.name}
-                      description={previewVenue.address}
-                      pinColor="#f2c14e"
-                    />
-                  )}
-                </MapView>
-
+              <>
                 {/* SELEKTOR DANA (samo ako više od 1 dana) */}
                 {generatedNumDays > 1 && (
                   <ScrollView
                     horizontal
                     showsHorizontalScrollIndicator={false}
-                    style={{
-                      backgroundColor: DC.card,
-                      paddingVertical: 8,
-                      paddingHorizontal: 10,
-                    }}
+                    style={{ marginTop: 12, paddingHorizontal: 16 }}
+                    contentContainerStyle={{ gap: 6, paddingRight: 32 }}
                   >
-                    <View style={{ flexDirection: "row", gap: 6 }}>
-                      {Array.from({
-                        length: Math.min(generatedNumDays, 7),
-                      }).map((_, i) => (
-                        <TouchableOpacity
-                          key={i}
-                          style={{
-                            paddingHorizontal: 14,
-                            paddingVertical: 6,
-                            borderRadius: 16,
-                            backgroundColor:
-                              activeDay === i
-                                ? ROUTE_COLORS[i % ROUTE_COLORS.length]
-                                : DC.bg,
-                            borderWidth: 1.5,
-                            borderColor: ROUTE_COLORS[i % ROUTE_COLORS.length],
-                          }}
-                          onPress={() => setActiveDay(i)}
-                        >
-                          <Text
-                            style={{
-                              fontSize: T.meta,
-                              fontWeight: "700",
-                              color:
-                                activeDay === i
-                                  ? "#fff"
-                                  : ROUTE_COLORS[i % ROUTE_COLORS.length],
-                            }}
-                          >
-                            {t("plan.dayLabel2", { day: i + 1 })}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  </ScrollView>
-                )}
-
-                {/* HORIZONTALNI SCROLL STOPOVA */}
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  style={{
-                    backgroundColor: DC.card,
-                    paddingVertical: 8,
-                    paddingHorizontal: 6,
-                  }}
-                >
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      gap: 6,
-                      alignItems: "flex-start",
-                    }}
-                  >
-                    {activeDayActivities.map((act, i) => {
-                      const isAct = activeStop === i;
-                      const isDone = completedStops.has(i);
-                      const color =
-                        ROUTE_COLORS[activeDay % ROUTE_COLORS.length];
-                      const bc = isDone
-                        ? "#34c759"
-                        : isAct
-                          ? color
-                          : DC.borderDim;
-                      return (
-                        <TouchableOpacity
-                          key={i}
-                          onPress={() => setActiveStop(i)}
-                          style={{
-                            width: 76,
-                            height: 76, // ← fiksna visina — svi isti
-                            borderRadius: 10,
-                            padding: 8,
-                            backgroundColor: isAct
-                              ? color + "18"
-                              : isDone
-                                ? "#34c75910"
-                                : DC.bg,
-                            borderWidth: 1.5,
-                            borderColor: bc,
-                            alignItems: "center",
-                            justifyContent: "center", // ← vertikalno centrirano
-                          }}
-                        >
-                          <View
-                            style={{
-                              width: 20,
-                              height: 20,
-                              borderRadius: 10,
-                              backgroundColor: bc,
-                              justifyContent: "center",
-                              alignItems: "center",
-                              marginBottom: 4,
-                            }}
-                          >
-                            <Text
-                              style={{
-                                color: "#fff",
-                                fontSize: 9,
-                                fontWeight: "900",
-                              }}
-                            >
-                              {isDone ? "✓" : i + 1}
-                            </Text>
-                          </View>
-                          <Text
-                            style={{
-                              fontSize: 10,
-                              color: DC.textDim,
-                              marginBottom: 2,
-                            }}
-                          >
-                            {act.time}
-                          </Text>
-                          {/* ← UKLONJENO: emoji ikona kategorije */}
-                          <Text
-                            style={{
-                              fontSize: 9,
-                              color: DC.text,
-                              fontWeight: "600",
-                              textAlign: "center",
-                              lineHeight: 12,
-                            }}
-                            numberOfLines={2}
-                          >
-                            {act.venueName}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                </ScrollView>
-              </View>
-            )}
-
-            {/* PROGRESS PILL — ispod scroll trake, iznad opisa */}
-            <View
-              style={{
-                backgroundColor: isDark
-                  ? "rgba(20,30,20,0.85)"
-                  : "rgba(255,255,255,0.88)",
-                borderRadius: 10,
-                paddingHorizontal: 12,
-                paddingVertical: 6,
-                alignSelf: "flex-end",
-                marginTop: 6,
-                marginRight: 4,
-                marginBottom: 2,
-              }}
-            >
-              <Text style={{ fontSize: T.caption, color: DC.textSub }}>
-                {t("plan.stopOf", {
-                  current: activeStop + 1,
-                  total: activeDayActivities.length,
-                })}
-              </Text>
-            </View>
-
-            {/* OPIS PUTA */}
-            <View style={{ marginHorizontal: 16, marginBottom: 12 }}>
-              <Text
-                style={{
-                  fontSize: T.meta,
-                  fontWeight: "700",
-                  color: DC.textSub,
-                  textTransform: "uppercase",
-                  letterSpacing: 0.5,
-                  marginBottom: 10,
-                }}
-              >
-                {" "}
-                {generatedNumDays > 1
-                  ? t("plan.dayPlanLabel", { day: activeDay + 1 })
-                  : t("plan.hourlyPlan")}
-              </Text>
-
-              <View
-                style={{
-                  backgroundColor: DC.card,
-                  borderRadius: 16,
-                  padding: 16,
-                  borderWidth: 1,
-                  borderColor: DC.borderDim,
-                }}
-              >
-                {activeDayActivities.map((activity, idx) => {
-                  const color = ROUTE_COLORS[activeDay % ROUTE_COLORS.length];
-                  const isActive = activeStop === idx;
-                  const isCompleted = completedStops.has(idx);
-                  const hasVenue = activity.venue !== null;
-                  const isVenueAlreadyVisited = activity.venue
-                    ? isVenueVisited(activity.venue, activity.venueType)
-                    : false;
-
-                  return (
-                    <TouchableOpacity
-                      key={`desc_${idx}`}
-                      activeOpacity={hasVenue ? 0.65 : 1}
-                      onPress={() => {
-                        if (hasVenue) {
-                          setActiveStop(idx);
-                          openVenueDetail(activity);
-                        }
-                      }}
-                      style={{
-                        backgroundColor: isActive
-                          ? color + "28"
-                          : isCompleted || isVenueAlreadyVisited
-                            ? "#34c75918"
-                            : hasVenue
-                              ? color + "12"
+                    {Array.from({
+                      length: Math.min(generatedNumDays, 7),
+                    }).map((_, i) => (
+                      <TouchableOpacity
+                        key={i}
+                        style={{
+                          paddingHorizontal: 14,
+                          paddingVertical: 6,
+                          borderRadius: 16,
+                          backgroundColor:
+                            activeDay === i
+                              ? ROUTE_COLORS[i % ROUTE_COLORS.length]
                               : DC.bg,
-                        borderRadius: 12,
-                        padding: 12,
-                        marginBottom: 8,
-                        borderLeftWidth: 4,
-                        borderLeftColor: isCompleted ? "#34c759" : color,
-                        borderWidth: isActive ? 2 : 0.5,
-                        borderColor: isActive ? color + "88" : DC.borderDim,
-                        flexDirection: "row",
-                        alignItems: "center",
-                        gap: 10,
-                      }}
-                    >
-                      {/* BROJ */}
-                      <View style={{ alignItems: "center", gap: 3 }}>
-                        <View
-                          style={{
-                            width: 32,
-                            height: 32,
-                            borderRadius: 16,
-                            backgroundColor:
-                              isCompleted || isVenueAlreadyVisited
-                                ? "#34c759"
-                                : color,
-                            justifyContent: "center",
-                            alignItems: "center",
-                            borderWidth: 2,
-                            borderColor: isActive ? "#fff" : "transparent",
-                          }}
-                        >
-                          <Text
-                            style={{
-                              color: "#fff",
-                              fontSize: T.meta,
-                              fontWeight: "900",
-                            }}
-                          >
-                            {isCompleted || isVenueAlreadyVisited
-                              ? "✓"
-                              : idx + 1}
-                          </Text>
-                        </View>
-                        {isActive && <PulsingDot color={color} />}
-                      </View>
-
-                      {/* TEKST */}
-                      <View style={{ flex: 1 }}>
+                          borderWidth: 1.5,
+                          borderColor: ROUTE_COLORS[i % ROUTE_COLORS.length],
+                        }}
+                        onPress={() => setActiveDay(i)}
+                      >
                         <Text
                           style={{
                             fontSize: T.meta,
                             fontWeight: "700",
-                            color: DC.text,
+                            color:
+                              activeDay === i
+                                ? "#fff"
+                                : ROUTE_COLORS[i % ROUTE_COLORS.length],
                           }}
                         >
-                          {activity.time} – {activity.venueName}{" "}
+                          {t("plan.dayLabel2", { day: i + 1 })}
                         </Text>
-                        <Text
-                          style={{
-                            fontSize: T.caption,
-                            color: DC.textSub,
-                            marginTop: 2,
-                          }}
-                        >
-                          {activity.description}
-                        </Text>
-                        <Text
-                          style={{ fontSize: T.caption, color: DC.textSub }}
-                        >
-                          {activity.duration} min • ~{activity.cost} EUR
-                        </Text>
-                      </View>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                )}
 
-                      {/* DUGME OTVORI */}
-                      {hasVenue && !(isCompleted || isVenueAlreadyVisited) && (
-                        <View
-                          style={{
-                            backgroundColor: isActive ? color : color + "CC",
-                            borderRadius: 10,
-                            paddingHorizontal: 12,
-                            paddingVertical: 6,
-                            flexDirection: "row",
-                            alignItems: "center",
-                            gap: 4,
-                          }}
-                        >
-                          <Text
-                            style={{
-                              fontSize: T.caption,
-                              color: "#fff",
-                              fontWeight: "800",
-                            }}
-                          >
-                            {t("plan.open")} →
-                          </Text>
-                        </View>
-                      )}
+                {/* KARTA */}
+                <View
+                  style={{
+                    marginHorizontal: 16,
+                    marginTop: 12,
+                    borderRadius: 16,
+                    overflow: "hidden",
+                    borderWidth: 1,
+                    borderColor: DC.borderDim,
+                  }}
+                >
+                  <MapView
+                    ref={mapRef}
+                    style={{ height: 320 }}
+                    initialRegion={{
+                      latitude:
+                        activeDayActivities[0]?.venue?.latitude ??
+                        geocodedCoords.latitude,
+                      longitude:
+                        activeDayActivities[0]?.venue?.longitude ??
+                        geocodedCoords.longitude,
+                      latitudeDelta: 0.02,
+                      longitudeDelta: 0.02,
+                    }}
+                    onMapReady={() => setMapReady(true)}
+                    customMapStyle={PLAN_MAP_STYLE}
+                    toolbarEnabled={false}
+                    moveOnMarkerPress={false}
+                    rotateEnabled={false}
+                    pitchEnabled={false}
+                    showsCompass={false}
+                    showsPointsOfInterests={false}
+                  >
+                    {(() => {
+                      const routeColor =
+                        ROUTE_COLORS[activeDay % ROUTE_COLORS.length];
+                      const stopCoords = activeDayActivities
+                        .filter((a) => a.venue)
+                        .map((a) => ({
+                          latitude: a.venue!.latitude,
+                          longitude: a.venue!.longitude,
+                        }));
+                      const showToMe =
+                        !!userLocation &&
+                        !!focusTarget &&
+                        haversineKm(
+                          userLocation.latitude,
+                          userLocation.longitude,
+                          focusTarget.latitude,
+                          focusTarget.longitude,
+                        ) <= FAR_KM;
 
-                      {/* OBIŠAO GUMB */}
-                      {hasVenue &&
-                        isActive &&
-                        !isCompleted &&
-                        !isVenueAlreadyVisited && (
-                          <TouchableOpacity
-                            style={{
-                              backgroundColor: "#34c759",
-                              borderRadius: 10,
-                              paddingHorizontal: 10,
-                              paddingVertical: 6,
-                            }}
-                            onPress={async (e) => {
-                              e.stopPropagation();
-                              if (activity.venue) {
-                                await handleMarkVisited(
-                                  activity.venue,
-                                  activity.venueType,
-                                );
-                                setCompletedStops(
-                                  (prev) => new Set([...prev, idx]),
-                                );
-                                if (idx + 1 < activeDayActivities.length) {
-                                  setActiveStop(idx + 1);
-                                }
+                      return (
+                        <>
+                          {/* Redoslijed postaja: tanka puna crta. */}
+                          {stopCoords.length > 1 && (
+                            <Polyline
+                              coordinates={stopCoords}
+                              strokeColor={routeColor + "99"}
+                              strokeWidth={3}
+                            />
+                          )}
+                          {/* Od mene do odabranog mjesta: isprekidana plava. */}
+                          {showToMe && userLocation && focusTarget && (
+                            <Polyline
+                              coordinates={[userLocation, focusTarget]}
+                              strokeColor="#1e88e5"
+                              strokeWidth={4}
+                              lineDashPattern={[10, 8]}
+                            />
+                          )}
+                          {userLocation && (
+                            <UserMarker coordinate={userLocation} />
+                          )}
+                          {activeDayActivities.map((activity, idx) => (
+                            <SimpleMarker
+                              key={`marker_${idx}`}
+                              activity={activity}
+                              color={
+                                placeCategories[
+                                  activity.venueType as keyof typeof placeCategories
+                                ]?.color ?? routeColor
                               }
-                            }}
-                          >
-                            <Text
-                              style={{
-                                fontSize: T.caption,
-                                color: "#fff",
-                                fontWeight: "900",
+                              isActive={
+                                !previewVenue &&
+                                activeStop === idx &&
+                                activity.venue !== null
+                              }
+                              isCompleted={completedStops.has(idx)}
+                              onPress={() => {
+                                if (activity.venue) selectStop(idx);
                               }}
-                            >
-                              {t("plan.visitedMark")} ✓
-                            </Text>
-                          </TouchableOpacity>
-                        )}
+                            />
+                          ))}
+                        </>
+                      );
+                    })()}
 
-                      {/* VEĆ POSJEĆENO */}
-                      {(isCompleted || isVenueAlreadyVisited) && (
-                        <View
-                          style={{
-                            backgroundColor: "#34c75922",
-                            borderRadius: 10,
-                            paddingHorizontal: 10,
-                            paddingVertical: 5,
-                            borderWidth: 1,
-                            borderColor: "#34c759",
-                          }}
-                        >
-                          <Text
-                            style={{
-                              fontSize: T.caption,
-                              color: "#34c759",
-                              fontWeight: "800",
-                            }}
-                          >
-                            ✓ {t("plan.visitedDone")}
-                          </Text>
-                        </View>
-                      )}
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
+                    {/* Mjesto koje korisnik upravo razgledava iz popisa. */}
+                    {previewVenue && (
+                      <Marker
+                        coordinate={{
+                          latitude: previewVenue.latitude,
+                          longitude: previewVenue.longitude,
+                        }}
+                        title={previewVenue.name}
+                        description={previewVenue.address}
+                        pinColor="#f2c14e"
+                        zIndex={10}
+                      />
+                    )}
+                  </MapView>
+
+                  {/* Prečaci za kameru */}
+                  <View
+                    style={{
+                      position: "absolute",
+                      top: 10,
+                      right: 10,
+                      gap: 8,
+                      alignItems: "flex-end",
+                    }}
+                  >
+                    {userLocation && focusTarget && (
+                      <TouchableOpacity
+                        onPress={() => focusOn(focusTarget)}
+                        style={mapPill(isDark)}
+                      >
+                        <Text style={mapPillText(isDark)}>
+                          🎯 {t("plan.showMeAndStop")}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                    {activeDayActivities.length > 1 && (
+                      <TouchableOpacity
+                        onPress={fitWholeDay}
+                        style={mapPill(isDark)}
+                      >
+                        <Text style={mapPillText(isDark)}>
+                          ⤢ {t("plan.showAllStops")}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+
+                {renderStopCard()}
+                {renderTimeline()}
+              </>
+            )}
 
             {/* MJESTA PO KATEGORIJAMA */}
             {Object.keys(allVenues).length > 0 && (
@@ -3048,7 +3524,12 @@ export function PlanMyDayModal({
                     marginBottom: 10,
                   }}
                 >
-                  {t("plan.allFoundPlaces")}
+                  {t("plan.allFoundPlaces")} (
+                  {Object.values(allVenues).reduce(
+                    (n, list) => n + list.length,
+                    0,
+                  )}
+                  )
                 </Text>
                 {Object.entries(allVenues).map(([type, options]) => {
                   const cat =
@@ -3196,6 +3677,7 @@ export function PlanMyDayModal({
                                     latitude: venue.latitude,
                                     longitude: venue.longitude,
                                     address: venue.address,
+                                    type,
                                   })
                                 }
                               >
