@@ -1961,6 +1961,7 @@ export function PlanMyDayModal({
             }}
           >
             {t("plan.findingPlaces", { destination })}
+            {__DEV__ ? "  · plan-v3 (max 30 s)" : ""}
           </Text>
         </View>
       </Modal>

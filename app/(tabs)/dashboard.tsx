@@ -326,6 +326,10 @@ const DEFAULT_TYPES = ["cafe", "restaurant", "park"];
 
 // Početni limit rezultata na karti
 const INITIAL_RESULTS_LIMIT = 20;
+/** Oznaka inačice učitavanja mjesta; u razvoju se vidi u traci "Učitavam…". */
+const LOAD_BUILD = "load-v3";
+/** Nakon ovoliko sekundi učitavanje se prekida i nudi "Ponovi", što god se dogodilo ispod. */
+const LOAD_WATCHDOG_MS = 25000;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface PlaceReview {
@@ -9746,6 +9750,16 @@ export default function DashboardScreen() {
   const [isLoadingPlaces, setIsLoadingPlaces] = useState(false);
   // Prvi rezultati su već na karti, ali drugi izvor još dopunjuje popis.
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  // Sekunde otkad traje učitavanje — da se vidi da aplikacija radi, a ne visi.
+  const [loadSeconds, setLoadSeconds] = useState(0);
+  useEffect(() => {
+    if (!isLoadingPlaces) {
+      setLoadSeconds(0);
+      return;
+    }
+    const id = setInterval(() => setLoadSeconds((n) => n + 1), 1000);
+    return () => clearInterval(id);
+  }, [isLoadingPlaces]);
   // Ishod zadnjeg dohvata: za koji je izbor i je li izvor zakazao. Bez toga
   // se "još učitavam" i "nema ničega" ne mogu razlikovati — oba su bila 0/0.
   const [lastLoad, setLastLoad] = useState<{
@@ -10351,6 +10365,16 @@ export default function DashboardScreen() {
     }
     setIsLoadingPlaces(true);
     setIsLoadingMore(true);
+    // Čuvar: ako išta ispod zapne (poslužitelj, mreža, tijelo odgovora koje ne
+    // stiže), traka ne smije vrtjeti beskrajno — nudi se "Ponovi". Kasniji
+    // rezultati se i dalje prikažu ako ipak stignu.
+    const watchdog = setTimeout(() => {
+      if (seq !== loadSeqRef.current) return;
+      if (__DEV__) console.log("[map] watchdog: giving up waiting after 25s");
+      setIsLoadingPlaces(false);
+      setIsLoadingMore(false);
+      setLastLoad({ key: loadKey, failed: true });
+    }, LOAD_WATCHDOG_MS);
     try {
       // Dva izvora rade ISTODOBNO. Google je obično gotov za ~1 s, OSM zna
       // trajati puno dulje — prije se čekalo jedno pa drugo i tek onda išta
@@ -10846,6 +10870,7 @@ export default function DashboardScreen() {
         setLastLoad({ key: loadKey, failed: true });
       }
     } finally {
+      clearTimeout(watchdog);
       if (seq === loadSeqRef.current) {
         setIsLoadingPlaces(false);
         setIsLoadingMore(false);
@@ -11288,7 +11313,14 @@ export default function DashboardScreen() {
               {selectedTypes.length > 0 ? ` (${selectedTypes.length})` : ""}
             </Text>
           </TouchableOpacity>
+        </View>
 
+        {/* Doba dana je UVIJEK u vlastitom retku ispod gumba kategorija. Prije je
+            bila u istom retku s prelamanjem: dok je natpis "Kategorije" kratak
+            stala je desno od njega, a čim bi dobio broj "(5)" (ili ga izgubio
+            dvostrukim dodirom na doba dana, koji poništi izbor) preskočila bi
+            u novi red — pa je skakala po ekranu. */}
+        <View style={{ flexDirection: "row" }}>
           {/* Doba dana — jedan izbor, pa i jedna kontrola s tri stanja.
               Tri kovanice se međusobno ne razaznaju, pa svaka nosi natpis
               (Jutro / Popodne / Večer). */}
@@ -12496,7 +12528,11 @@ export default function DashboardScreen() {
           {isLoadingPlaces ? (
             <>
               <ActivityIndicator size="small" color="#a0d080" />
-              <Text style={UI_STYLES.infoBarText}>{t("map.loading")}...</Text>
+              <Text style={UI_STYLES.infoBarText}>
+                {t("map.loading")}
+                {loadSeconds >= 4 ? ` ${loadSeconds} s` : ""}
+                {__DEV__ ? ` · ${LOAD_BUILD}` : ""}
+              </Text>
             </>
           ) : (
             (() => {
