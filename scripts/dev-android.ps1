@@ -8,9 +8,16 @@
 #
 # Run from anywhere:
 #   powershell -ExecutionPolicy Bypass -File scripts\dev-android.ps1
+# Low on disk space? Lower the limit (the build may then fail part-way):
+#   powershell -ExecutionPolicy Bypass -File scripts\dev-android.ps1 -MinFreeGb 5
 #
 # The file is deliberately ASCII-only: Windows PowerShell 5.1 reads BOM-less files
 # as ANSI and garbles other characters.
+
+param(
+  # Minimum free disk space (GB) before building. The first Android build needs roughly 5-8 GB.
+  [double]$MinFreeGb = 8
+)
 
 $ErrorActionPreference = "Stop"
 Set-Location (Split-Path $PSScriptRoot -Parent)
@@ -30,7 +37,9 @@ if (-not (Test-Path "node_modules")) {
 
 $freeGb = [math]::Round((Get-PSDrive -Name ($PWD.Drive.Name)).Free / 1GB, 1)
 Write-Host "Free disk space on $($PWD.Drive.Name): $freeGb GB"
-if ($freeGb -lt 8) { Fail "Less than 8 GB free. The Android build needs several GB - free some space and run again." }
+if ($freeGb -lt $MinFreeGb) {
+  Fail "Only $freeGb GB free (need $MinFreeGb). Free some space, or accept the risk of a failed build with: scripts\dev-android.ps1 -MinFreeGb 5"
+}
 
 if (-not $env:JAVA_HOME) {
   $jbr = "C:\Program Files\Android\Android Studio\jbr"
