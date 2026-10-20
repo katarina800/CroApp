@@ -47,6 +47,11 @@ import {
 } from "@/hooks/use-keyboard-offset";
 import { useActivePolling } from "@/hooks/use-active-polling";
 import { isOpenAt, isOpenDuringWindow } from "@/utils/openingHours";
+import {
+  findPlaceNew,
+  nearbySearchNew,
+  placePhotoUrl,
+} from "@/app/services/googlePlacesNew";
 import { NotificationsModal } from "@/components/NotificationsModal";
 import {
   getNotificationPreferences,
@@ -960,42 +965,27 @@ async function fetchGoogleDetails(
   lng: number,
 ): Promise<PlaceDetails | null> {
   if (!GOOGLE_KEY) return null;
-  try {
-    const findRes = await fetchWithTimeout(
-      `https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input=${encodeURIComponent(name)}&inputtype=textquery&locationbias=circle:500@${lat},${lng}&fields=place_id&key=${GOOGLE_KEY}`,
-    );
-    if (!findRes.ok) return null;
-    const findData = await findRes.json();
-    if (findData.status !== "OK") return null;
-    const placeId = findData.candidates?.[0]?.place_id;
-    if (!placeId) return null;
-    const detRes = await fetchWithTimeout(
-      `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=opening_hours,photos,rating,formatted_phone_number&key=${GOOGLE_KEY}`,
-    );
-    if (!detRes.ok) return null;
-    const det = await detRes.json();
-    if (det.status !== "OK") return null;
-    const r = det.result;
-    const photos = (r.photos || [])
+  const { place } = await findPlaceNew({
+    key: GOOGLE_KEY,
+    name,
+    latitude: lat,
+    longitude: lng,
+  });
+  if (!place) return null;
+
+  let openingHours: string | null = null;
+  if (place.openingHours) openingHours = place.openingHours;
+  else if (place.openNow !== null)
+    openingHours = place.openNow ? "__OPEN__" : "__CLOSED__";
+
+  return {
+    photos: place.photoNames
       .slice(0, 3)
-      .map(
-        (p: any) =>
-          `https://maps.googleapis.com/maps/api/place/photo?maxwidth=800&photo_reference=${p.photo_reference}&key=${GOOGLE_KEY}`,
-      );
-    let openingHours: string | null = null;
-    if (r.opening_hours?.weekday_text?.length)
-      openingHours = r.opening_hours.weekday_text.join("\n");
-    else if (r.opening_hours?.open_now !== undefined)
-      openingHours = r.opening_hours.open_now ? "__OPEN__" : "__CLOSED__";
-    return {
-      photos,
-      openingHours,
-      rating: r.rating,
-      phone: r.formatted_phone_number,
-    };
-  } catch {
-    return null;
-  }
+      .map((n) => placePhotoUrl(n, GOOGLE_KEY)),
+    openingHours,
+    rating: place.rating,
+    phone: place.phone,
+  };
 }
 
 // ─── Backend: visits ─────────────────────────────────────────────────────────
@@ -9071,9 +9061,11 @@ function MapCtrlTooltip({
 }
 
 // Google Places Nearby Search — vraća sve tipove odjednom
+// Nazivi tipova iz Places API (New). Svi tipovi jedne kategorije idu u JEDAN
+// upit (includedTypes), a ne po jedan upit za svaki tip kao prije.
 const GOOGLE_TYPE_MAP: Partial<Record<Place["type"], string[]>> = {
-  restaurant: ["restaurant", "food", "meal_delivery", "meal_takeaway"],
-  cafe: ["cafe"],
+  restaurant: ["restaurant", "fast_food_restaurant", "meal_takeaway"],
+  cafe: ["cafe", "coffee_shop"],
   club: ["night_club"],
   cinema: ["movie_theater"],
   museum: ["museum"],
@@ -9084,6 +9076,10 @@ const GOOGLE_TYPE_MAP: Partial<Record<Place["type"], string[]>> = {
   landmark: ["tourist_attraction", "place_of_worship"],
   opg: ["farm"],
 };
+
+/** Rezultati Googleovih upita ostaju u memoriji: isti upit se ne ponavlja (brže i jeftinije). */
+const GOOGLE_CACHE_MS = 20 * 60 * 1000;
+const googleNearbyCache = new Map<string, { at: number; places: Place[] }>();
 
 async function fetchGoogleNearby(
   latitude: number,
@@ -9100,58 +9096,59 @@ async function fetchGoogleNearby(
     const googleTypes = GOOGLE_TYPE_MAP[type as Place["type"]];
     if (!googleTypes) continue;
 
-    for (const googleType of googleTypes) {
+    {
       promises.push(
         (async (): Promise<Place[]> => {
           try {
-            const ctrl = new AbortController();
-            const tid = setTimeout(() => ctrl.abort(), 8000);
-            // ← KLJUČNA PROMJENA: za "food" tip dodaj keyword=fast_food
-            const extraParam =
-              googleType === "food" ? "&keyword=fast_food" : "";
-            const res = await fetch(
-              `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${latitude},${longitude}&radius=${radiusCapped}&type=${googleType}${extraParam}&key=${GOOGLE_KEY}`,
-              { signal: ctrl.signal },
-            );
-            clearTimeout(tid);
-            if (!res.ok) return [];
-            const data = await res.json();
-            if (data.status !== "OK" || !data.results?.length) return [];
-
-            // ========== SPREMI REZULTATE U VARIJABLU ==========
-            let results = data.results.map((item: any): Place => ({
-              id: `google_${item.place_id}`,
-              name: item.name,
-              latitude: item.geometry.location.lat,
-              longitude: item.geometry.location.lng,
-              type: type as Place["type"],
-              rating: item.rating,
-              address: item.vicinity,
-              distance: haversineKm(
+            const cacheKey = `${type}|${latitude.toFixed(3)},${longitude.toFixed(3)}|${radiusCapped}`;
+            const hit = googleNearbyCache.get(cacheKey);
+            let found: Place[];
+            if (hit && Date.now() - hit.at < GOOGLE_CACHE_MS) {
+              found = hit.places;
+            } else {
+              const res = await nearbySearchNew({
+                key: GOOGLE_KEY,
                 latitude,
                 longitude,
-                item.geometry.location.lat,
-                item.geometry.location.lng,
-              ),
-              openNow: item.opening_hours?.open_now ?? null,
-            }));
+                radiusM: radiusCapped,
+                includedTypes: googleTypes,
+              });
+              // Neuspjeh se ne sprema: sljedeći pokušaj ide na mrežu.
+              if (res.error) return [];
 
-            // Google u rezultatima vraća i lokale koji su trajno zatvoreni
-            // (business_status: CLOSED_PERMANENTLY) ili privremeno ne rade.
-            // Dosad se to polje nije gledalo, pa su takva mjesta završavala
-            // na karti kao svako drugo — korisnik dođe pred zatvorena vrata.
-            const closedIds = new Set<string>(
-              data.results
+              // Google vraća i trajno zatvorene (business_status
+              // CLOSED_PERMANENTLY) i privremeno nedostupne lokale; takva
+              // mjesta ne smiju završiti na karti kao svako drugo.
+              found = res.places
                 .filter(
-                  (item: any) =>
-                    item.business_status &&
-                    item.business_status !== "OPERATIONAL",
+                  (p) =>
+                    !p.businessStatus || p.businessStatus === "OPERATIONAL",
                 )
-                .map((item: any) => `google_${item.place_id}`),
-            );
-            if (closedIds.size > 0) {
-              results = results.filter((p: Place) => !closedIds.has(p.id));
+                .map((p): Place => ({
+                  id: `google_${p.id}`,
+                  name: p.name,
+                  latitude: p.latitude,
+                  longitude: p.longitude,
+                  type: type as Place["type"],
+                  rating: p.rating,
+                  address: p.address,
+                  distance: haversineKm(
+                    latitude,
+                    longitude,
+                    p.latitude,
+                    p.longitude,
+                  ),
+                  openNow: p.openNow,
+                  // Zapisano radno vrijeme omogućuje pouzdan filter po doba
+                  // dana (prije je postojalo samo "otvoreno ovog trena").
+                  openingHours: p.openingHours,
+                }));
+              googleNearbyCache.set(cacheKey, {
+                at: Date.now(),
+                places: found,
+              });
             }
+            let results: Place[] = [...found];
 
             // FILTER ZA THEATER
             if (type === "theater") {
