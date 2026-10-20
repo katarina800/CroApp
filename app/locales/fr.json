@@ -55,7 +55,10 @@
     "settings": "Paramètres",
     "accept": "Accepter",
     "decline": "Refuser",
-    "comments": "Commentaires"
+    "comments": "Commentaires",
+    "unsavedChanges": "Tu as des modifications non enregistrées",
+    "sessionExpired": "Ta session a expiré. Reconnecte-toi.",
+    "requestTimeout": "La requête a pris trop de temps. Vérifie ta connexion et réessaie."
   },
   "auth": {
     "login": "Connexion",
@@ -160,7 +163,12 @@
     "successTitle": "Succès ! ✅",
     "successDesc": "Votre mot de passe a été changé. Veuillez vous connecter.",
     "invalidCode": "Le code est incorrect ou a expiré.",
-    "backToLogin": "← Retour à la connexion"
+    "backToLogin": "← Retour à la connexion",
+    "resendNow": "Envoyer un nouveau code",
+    "resendIn": "Renvoyer dans {{s}} s",
+    "resent": "Un nouveau code a été envoyé. L'ancien code n'est plus valable.",
+    "changeEmail": "Utiliser une autre e-mail",
+    "emailUnavailable": "Nous ne pouvons pas envoyer l’e-mail avec le code pour le moment. Réessaie dans quelques minutes ou contacte-nous."
   },
   "password": {
     "minLength": "Min. 6 caractères",
@@ -377,11 +385,15 @@
     "reportFailed": "Le signalement n'a pas été envoyé. Vérifie ta connexion et réessaie.",
     "members": "Membres",
     "emptyTitle": "Aucun lieu dans cette zone",
-    "emptyBody": "Active d'autres catégories ou dézoome pour couvrir une zone plus large."
+    "emptyBody": "Active d'autres catégories ou dézoome pour couvrir une zone plus large.",
+    "filtersHint": "Choisis un rayon, un moment de la journée et des catégories. La carte se met à jour quand tu fermes ce panneau.",
+    "searchCategories": "Rechercher une catégorie…",
+    "noCategoryMatch": "Aucune catégorie de ce nom.",
+    "radiusUnit": "Rayon de recherche : {{km}} km",
+    "hideCircle": "Masquer le cercle"
   },
   "videos": {
     "title": "Vidéos",
-    "members": "membres",
     "savedToBoxTitle": "Enregistré dans le Coffre",
     "savedToBoxDesc": "Vous pouvez revoir cette vidéo dans votre profil, dans la section Coffre.",
     "addedToWishlistTitle": "Ajouté à la liste de souhaits",
@@ -964,8 +976,6 @@
     "distanceFromAccommodation": "📏 Distance de l'hébergement",
     "venueSelected": "Sélectionné",
     "shareFailed": "Impossible de partager le plan.",
-    "numberOfVenues": "Nombre d'options proposées par catégorie",
-    "minVenues": "min. {{count}} options",
     "fetchingPlacesFrom": "Récupération des vrais lieux depuis {{destination}}...",
     "destinationPlaceholder": "Ville ou lieu (ex: Split)",
     "postalCode": "Code postal",
@@ -1039,7 +1049,8 @@
     "actClub": "Sortie nocturne",
     "anonymous": "Utilisateur anonyme",
     "travelFromPrevious": "{{min}} min depuis l'arrêt précédent",
-    "firstStop": "Premier arrêt"
+    "firstStop": "Premier arrêt",
+    "noVenues": "Impossible de charger les lieux de cette ville pour le moment. Le service est temporairement surchargé ou le rayon est trop petit. Patientez une minute puis réessayez, ou augmentez le rayon."
   },
   "story": {
     "myStory": "Mon story",
@@ -1125,7 +1136,15 @@
     "titleFor": "Publications pour {{place}} et les environs",
     "rangeLabel": "Rayon",
     "categoriesLabel": "Catégories",
-    "from": "de {{place}}"
+    "from": "de {{place}}",
+    "hintTitle": "Que se passe-t-il par ici ?",
+    "hintBody": "Retrouve ici les publications et événements d’autres voyageurs autour du centre de la carte. Choisis un rayon et, si tu veux, une catégorie, puis parcours les résultats.",
+    "hintOk": "Compris",
+    "helpLabel": "Aide",
+    "allCategories": "Toutes les catégories",
+    "searchCategories": "Rechercher une catégorie…",
+    "clearCats": "Effacer la sélection",
+    "resultsCount": "Résultats : {{count}}"
   },
   "media": {
     "permissionNeeded": "Autorisation requise",
@@ -1155,5 +1174,20 @@
     "s7Body": "Suis les personnes et les catégories qui t'intéressent. La cloche te prévient dès qu'il y a du nouveau près de toi.",
     "sectionTitle": "Guide",
     "sectionDesc": "Un aperçu rapide de VARA — sept étapes."
+  },
+  "verifyEmail": {
+    "title": "Confirmez votre e-mail",
+    "subtitle": "Nous avons envoyé un code à 6 chiffres à {{email}}",
+    "codeLabel": "Code à 6 chiffres",
+    "verifyBtn": "Confirmer l'e-mail",
+    "resend": "Envoyer un nouveau code",
+    "resendIn": "Renvoyer dans {{s}} s",
+    "resent": "Un nouveau code a été envoyé à votre e-mail.",
+    "checkSpam": "Si vous ne voyez pas le message, vérifiez votre dossier spam.",
+    "successTitle": "E-mail confirmé ✅",
+    "successDesc": "Votre compte est prêt. Connectez-vous.",
+    "invalidCode": "Le code est incorrect ou a expiré.",
+    "enterCode": "Saisissez le code à 6 chiffres",
+    "backToLogin": "← Retour à la connexion"
   }
 }

@@ -12,7 +12,6 @@ import {
   Image,
   KeyboardAvoidingView,
   Platform,
-  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
@@ -25,6 +24,10 @@ import { API_ENDPOINTS } from "./config/api";
 import * as Linking from "expo-linking";
 import { API_BASE_URL } from "./config/api";
 import { T } from "../styles/varaTheme";
+import { KeyboardSafeScrollView } from "../components/KeyboardSafeScrollView";
+import { apiFetch, describeNetworkError } from "@/utils/apiFetch";
+import { A } from "../styles/authTheme";
+import { Ionicons } from "@expo/vector-icons";
 
 type PasswordStrength = "empty" | "weak" | "medium" | "strong";
 
@@ -65,10 +68,10 @@ const STRENGTH_COLORS: Record<
   PasswordStrength,
   { color: string; barWidth: `${number}%` }
 > = {
-  empty: { color: "#D1DADB", barWidth: "0%" },
-  weak: { color: "#C0392B", barWidth: "33%" },
-  medium: { color: "#E29A1E", barWidth: "66%" },
-  strong: { color: "#4CAF50", barWidth: "100%" },
+  empty: { color: A.divider, barWidth: "0%" },
+  weak: { color: A.error, barWidth: "33%" },
+  medium: { color: A.warn, barWidth: "66%" },
+  strong: { color: A.valid, barWidth: "100%" },
 };
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -203,15 +206,22 @@ export default function RegisterScreen() {
         email: form.email.trim() || null,
         language: i18n.language,
       };
-      const response = await fetch(API_ENDPOINTS.REGISTER, {
+      const response = await apiFetch(API_ENDPOINTS.REGISTER, {
         method: "POST",
+        auth: false,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(dataToSend),
       });
       if (response.ok) {
-        Alert.alert(t("common.success"), t("auth.registerSuccess"), [
-          { text: t("auth.loginBtn"), onPress: () => router.push("/login") },
-        ]);
+        // Račun postoji, ali se otvara tek kad se potvrdi kod poslan na e-mail.
+        // Adresa iz odgovora je ona koju je poslužitelj spremio (obrezana).
+        const created = await response.json().catch(() => null);
+        router.replace({
+          pathname: "/verify-email",
+          params: { email: created?.email ?? dataToSend.email ?? "" },
+        });
+      } else if (response.status === 429) {
+        Alert.alert(t("common.error"), t("common.tooManyRequests"));
       } else {
         const errorData = await response.json().catch(() => null);
         if (errorData?.field === "username" && errorData?.code === "taken") {
@@ -238,8 +248,8 @@ export default function RegisterScreen() {
           Alert.alert(t("common.error"), t("validation.registerFailed"));
         }
       }
-    } catch {
-      Alert.alert(t("common.error"), t("common.networkError"));
+    } catch (err) {
+      Alert.alert(t("common.error"), describeNetworkError(err, t));
     } finally {
       setIsLoading(false);
     }
@@ -271,9 +281,9 @@ export default function RegisterScreen() {
       // koristi useInputBottomOffset iz hooks/use-keyboard-offset.)
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <StatusBar barStyle="light-content" backgroundColor="#0D2406" />
+      <StatusBar barStyle="light-content" backgroundColor={A.statusBar} />
 
-      <ScrollView
+      <KeyboardSafeScrollView
         contentContainerStyle={s.scroll}
         keyboardShouldPersistTaps="handled"
       >
@@ -281,11 +291,10 @@ export default function RegisterScreen() {
         <View style={s.headerWrap}>
           <View style={s.header}>
             <Image
-              source={require("../assets/images/vara_icon.png")}
+              source={require("../assets/images/vara_logo.png")}
               style={{
-                width: isCompact ? 30 : 36,
-                height: isCompact ? 30 : 36,
-                borderRadius: 6,
+                width: isCompact ? 28 : 34,
+                height: isCompact ? 36 : 44,
               }}
               resizeMode="contain"
             />
@@ -305,12 +314,13 @@ export default function RegisterScreen() {
               <Text style={s.label}>{t("auth.firstName").toUpperCase()} *</Text>
               <View style={{ justifyContent: "center" }}>
                 <TextInput
+                  selectTextOnFocus
                   style={[
                     s.input,
                     form.firstName.trim().length > 0 && s.inputValid,
                   ]}
-                  placeholder="npr. Ana"
-                  placeholderTextColor="#9AA9A7"
+                  placeholder={t("auth.firstNamePlaceholder")}
+                  placeholderTextColor={A.placeholder}
                   value={form.firstName}
                   onChangeText={(v) => handleChange("firstName", v)}
                   editable={!isBusy}
@@ -325,12 +335,13 @@ export default function RegisterScreen() {
               <Text style={s.label}>{t("auth.lastName").toUpperCase()} *</Text>
               <View style={{ justifyContent: "center" }}>
                 <TextInput
+                  selectTextOnFocus
                   style={[
                     s.input,
                     form.lastName.trim().length > 0 && s.inputValid,
                   ]}
-                  placeholder="npr. Horvat"
-                  placeholderTextColor="#9AA9A7"
+                  placeholder={t("auth.lastNamePlaceholder")}
+                  placeholderTextColor={A.placeholder}
                   value={form.lastName}
                   onChangeText={(v) => handleChange("lastName", v)}
                   editable={!isBusy}
@@ -345,7 +356,7 @@ export default function RegisterScreen() {
 
           <Field
             label={`${t("auth.email").toUpperCase()} *`}
-            placeholder="npr. ana.horvat@gmail.com"
+            placeholder={t("auth.emailPlaceholder")}
             helperText={t("auth.emailHelperRegister")}
             value={form.email}
             onChangeText={(v) => handleChange("email", v)}
@@ -356,7 +367,7 @@ export default function RegisterScreen() {
           />
           <Field
             label={`${t("auth.username").toUpperCase()} *`}
-            placeholder="npr. ana_horvat"
+            placeholder={t("auth.usernamePlaceholder")}
             helperText={t("auth.usernameHelperRegister")}
             value={form.username}
             onChangeText={(v) => handleChange("username", v)}
@@ -371,9 +382,10 @@ export default function RegisterScreen() {
             <Text style={s.label}>{t("auth.password").toUpperCase()} *</Text>
             <View style={{ position: "relative", justifyContent: "center" }}>
               <TextInput
+                selectTextOnFocus
                 style={[s.input, form.password.length >= 6 && s.inputValid]}
-                placeholder="Najmanje 6 znakova"
-                placeholderTextColor="#9AA9A7"
+                placeholder={t("forgotPassword.newPasswordPlaceholder")}
+                placeholderTextColor={A.placeholder}
                 value={form.password}
                 onChangeText={(v) => handleChange("password", v)}
                 secureTextEntry={!showPassword}
@@ -391,11 +403,11 @@ export default function RegisterScreen() {
                 onPress={() => setShowPassword((v) => !v)}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
-                <Text
-                  style={{ fontSize: T.title, opacity: showPassword ? 1 : 0.5 }}
-                >
-                  👁️
-                </Text>
+                <Ionicons
+                  name={showPassword ? "eye" : "eye-off"}
+                  size={22}
+                  color={showPassword ? A.accent : A.textDim}
+                />
               </TouchableOpacity>
             </View>
 
@@ -407,8 +419,8 @@ export default function RegisterScreen() {
                   form.password.length === 0
                     ? MUTED
                     : form.password.length < 6
-                      ? "#C0392B"
-                      : "#4CAF50",
+                      ? A.error
+                      : A.valid,
               }}
             >
               {t("password.minLength")}
@@ -420,7 +432,7 @@ export default function RegisterScreen() {
                   style={{
                     height: 4,
                     borderRadius: 2,
-                    backgroundColor: "#E8EEEE",
+                    backgroundColor: A.divider,
                     overflow: "hidden",
                   }}
                 >
@@ -463,7 +475,7 @@ export default function RegisterScreen() {
                 style={{
                   fontSize: T.meta,
                   fontWeight: "700",
-                  color: GREEN_MID,
+                  color: A.accent,
                   textDecorationLine: "underline",
                 }}
               >
@@ -476,9 +488,10 @@ export default function RegisterScreen() {
             <View style={{ flexDirection: "row", gap: 8 }}>
               <View style={{ flex: 1, justifyContent: "center" }}>
                 <TextInput
+                  selectTextOnFocus
                   style={[s.input, isBirthDateValid && s.inputValid]}
                   placeholder={t("auth.birthDatePlaceholder")}
-                  placeholderTextColor="#9AA9A7"
+                  placeholderTextColor={A.placeholder}
                   value={form.birthDate}
                   onChangeText={(v) => handleChange("birthDate", v)}
                   editable={!isBusy}
@@ -490,14 +503,14 @@ export default function RegisterScreen() {
                   width: 46,
                   borderRadius: 10,
                   borderWidth: 1.5,
-                  borderColor: "#D1DADB",
-                  backgroundColor: SILVER_LIGHT,
+                  borderColor: A.divider,
+                  backgroundColor: A.inputBg,
                   alignItems: "center",
                   justifyContent: "center",
                 }}
                 onPress={() => setShowPicker(true)}
               >
-                <Text style={{ fontSize: T.title }}>📅</Text>
+                <Ionicons name="calendar-outline" size={22} color={A.accent} />
               </TouchableOpacity>
             </View>
             <Text style={s.helperText}>{t("auth.birthDateHelper")}</Text>
@@ -527,7 +540,7 @@ export default function RegisterScreen() {
             activeOpacity={0.85}
           >
             {isLoading ? (
-              <ActivityIndicator color="#fff" />
+              <ActivityIndicator color={A.onPrimary} />
             ) : (
               <Text style={s.btnText}>{t("auth.registerBtn")}</Text>
             )}
@@ -541,13 +554,13 @@ export default function RegisterScreen() {
               marginBottom: 4,
             }}
           >
-            <View style={{ flex: 1, height: 1, backgroundColor: "#D1DADB" }} />
+            <View style={{ flex: 1, height: 1, backgroundColor: A.divider }} />
             <Text
               style={{ marginHorizontal: 10, color: MUTED, fontSize: T.meta }}
             >
               {t("common.or").toUpperCase()}
             </Text>
-            <View style={{ flex: 1, height: 1, backgroundColor: "#D1DADB" }} />
+            <View style={{ flex: 1, height: 1, backgroundColor: A.divider }} />
           </View>
 
           <TouchableOpacity
@@ -577,17 +590,14 @@ export default function RegisterScreen() {
           </TouchableOpacity>
         </View>
 
-        <Text style={s.bottomNote}>{t("auth.registerTerms")}</Text>
-        {/* Oba ekrana su otprije pisala da korisnik prihvaća pravila
-            privatnosti, a pravila nisu postojala niti su bila dostupna.
-            Sada vode na stranicu koju poslužuje poslužitelj. */}
         <Text
           style={[s.bottomNote, { textDecorationLine: "underline" }]}
           onPress={() => Linking.openURL(`${API_BASE_URL}/privacy.html`)}
+          accessibilityRole="link"
         >
-          {t("auth.privacyLink")}
+          {t("auth.registerTerms")}
         </Text>
-      </ScrollView>
+      </KeyboardSafeScrollView>
     </KeyboardAvoidingView>
   );
 }
@@ -615,13 +625,14 @@ function Field(props: {
       </Text>
       <View style={{ justifyContent: "center" }}>
         <TextInput
+          selectTextOnFocus
           style={[
             s.input,
             focused && s.inputFocused,
             showValid && s.inputValid,
           ]}
           placeholder={props.placeholder}
-          placeholderTextColor="#9AA9A7"
+          placeholderTextColor={A.placeholder}
           value={props.value}
           onChangeText={props.onChangeText}
           secureTextEntry={props.secureTextEntry}
@@ -638,11 +649,9 @@ function Field(props: {
   );
 }
 
-const GREEN_DARK = "#1B3F0E";
-const GREEN_MID = "#2D6418";
-const SILVER_LIGHT = "#E8EEEE";
-const TEXT = "#142F09";
-const MUTED = "#5C6765";
+const GREEN_DARK = A.bg;
+const TEXT = A.text;
+const MUTED = A.textDim;
 
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: GREEN_DARK },
@@ -675,12 +684,14 @@ const s = StyleSheet.create({
   },
   headerSub: {
     fontSize: T.meta,
-    color: "rgba(200,225,200,0.55)",
+    color: A.textDim,
     letterSpacing: 0.5,
     marginTop: 2,
   },
   card: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: A.card,
+    borderWidth: 1,
+    borderColor: A.cardBorder,
     borderRadius: 24,
     padding: 24,
     width: "100%",
@@ -701,46 +712,50 @@ const s = StyleSheet.create({
     letterSpacing: 1.2,
     marginBottom: 6,
   },
-  optional: { color: "#9AA9A7", fontWeight: "400" },
+  optional: { color: A.textDim, fontWeight: "400" },
   helperText: {
     fontSize: T.meta,
     color: MUTED,
     marginTop: 6,
   },
   input: {
-    backgroundColor: SILVER_LIGHT,
+    backgroundColor: A.inputBg,
     borderRadius: 10,
     borderWidth: 1.5,
-    borderColor: "#D1DADB",
+    borderColor: A.divider,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: T.body,
     color: TEXT,
   },
-  inputFocused: { borderColor: GREEN_MID, backgroundColor: "#FFFFFF" },
-  inputValid: { borderColor: "#4CAF50", backgroundColor: "#FFFFFF" },
+  inputFocused: { borderColor: A.focus, backgroundColor: A.inputBgFocus },
+  inputValid: { borderColor: A.valid, backgroundColor: A.inputBgFocus },
   validCheckmark: {
     position: "absolute",
     right: 14,
-    color: "#4CAF50",
+    color: A.valid,
     fontSize: T.lead,
     fontWeight: "700",
   },
   btn: {
-    backgroundColor: GREEN_MID,
+    backgroundColor: A.primary,
     borderRadius: 14,
     paddingVertical: 16,
     alignItems: "center",
     marginTop: 8,
-    shadowColor: "#0D2406",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 10,
     elevation: 6,
   },
-  btnDisabled: { backgroundColor: "#9AA9A7", shadowOpacity: 0, elevation: 0 },
+  btnDisabled: {
+    backgroundColor: A.primaryDisabled,
+    shadowOpacity: 0,
+    elevation: 0,
+  },
   btnText: {
-    color: "#FFFFFF",
+    color: A.onPrimary,
     fontSize: T.lead,
     fontWeight: "700",
     letterSpacing: 0.5,
@@ -754,8 +769,8 @@ const s = StyleSheet.create({
     paddingVertical: 14,
     marginTop: 12,
     borderWidth: 1.5,
-    borderColor: "#D1DADB",
-    backgroundColor: "#FFFFFF",
+    borderColor: A.divider,
+    backgroundColor: A.inputBg,
   },
   googleBtnText: {
     fontSize: T.body,
@@ -764,10 +779,10 @@ const s = StyleSheet.create({
   },
   linkWrap: { marginTop: 20, alignItems: "center" },
   linkText: { fontSize: T.body, color: MUTED },
-  linkBold: { color: GREEN_MID, fontWeight: "700" },
+  linkBold: { color: A.accent, fontWeight: "700" },
   bottomNote: {
     fontSize: T.caption,
-    color: "rgba(200,225,200,0.4)",
+    color: A.textDim,
     textAlign: "center",
     marginTop: 24,
     maxWidth: 480,

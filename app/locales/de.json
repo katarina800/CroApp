@@ -55,7 +55,10 @@
     "settings": "Einstellungen",
     "accept": "Annehmen",
     "decline": "Ablehnen",
-    "comments": "Kommentare"
+    "comments": "Kommentare",
+    "unsavedChanges": "Du hast nicht gespeicherte Änderungen",
+    "sessionExpired": "Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.",
+    "requestTimeout": "Die Anfrage hat zu lange gedauert. Prüfe deine Verbindung und versuche es erneut."
   },
   "auth": {
     "login": "Anmeldung",
@@ -160,7 +163,12 @@
     "successTitle": "Erfolg! ✅",
     "successDesc": "Ihr Passwort wurde geändert. Bitte melden Sie sich an.",
     "invalidCode": "Der Code ist falsch oder abgelaufen.",
-    "backToLogin": "← Zurück zur Anmeldung"
+    "backToLogin": "← Zurück zur Anmeldung",
+    "resendNow": "Neuen Code senden",
+    "resendIn": "Erneut senden in {{s}} s",
+    "resent": "Ein neuer Code wurde gesendet. Der vorherige Code ist nicht mehr gültig.",
+    "changeEmail": "Andere E-Mail verwenden",
+    "emailUnavailable": "Die E-Mail mit dem Code kann gerade nicht gesendet werden. Bitte versuche es in einigen Minuten erneut oder kontaktiere uns."
   },
   "validation": {
     "enterFirstName": "Bitte geben Sie Ihren Vornamen ein.",
@@ -365,7 +373,12 @@
     "reportSentBody": "Deine Meldung wurde an den Admin geschickt. Wir prüfen die Angabe.",
     "reportFailed": "Die Meldung wurde nicht gesendet. Prüfe deine Verbindung und versuch es erneut.",
     "emptyTitle": "Keine Orte in diesem Gebiet",
-    "emptyBody": "Schalte weitere Kategorien ein oder zoome heraus, um mehr abzudecken."
+    "emptyBody": "Schalte weitere Kategorien ein oder zoome heraus, um mehr abzudecken.",
+    "filtersHint": "Wähle Radius, Tageszeit und Kategorien. Die Karte aktualisiert sich, sobald du das Panel schließt.",
+    "searchCategories": "Kategorie suchen…",
+    "noCategoryMatch": "Keine Kategorie mit diesem Namen.",
+    "radiusUnit": "Suchradius: {{km}} km",
+    "hideCircle": "Kreis ausblenden"
   },
   "password": {
     "minLength": "Min. 6 Zeichen",
@@ -913,8 +926,6 @@
     "distanceFromAccommodation": "📏 Entfernung von der Unterkunft",
     "venueSelected": "Ausgewählt",
     "shareFailed": "Plan konnte nicht geteilt werden.",
-    "numberOfVenues": "Anzahl der angebotenen Optionen pro Kategorie",
-    "minVenues": "min. {{count}} Optionen",
     "fetchingPlacesFrom": "Lade echte Orte aus {{destination}}...",
     "destinationPlaceholder": "Stadt oder Ort (z.B. Split)",
     "postalCode": "Postleitzahl",
@@ -988,7 +999,8 @@
     "actClub": "Abend im Club",
     "anonymous": "Anonymer Nutzer",
     "travelFromPrevious": "{{min}} Min. von der vorigen Station",
-    "firstStop": "Erste Station"
+    "firstStop": "Erste Station",
+    "noVenues": "Für diese Stadt konnten wir gerade keine Orte laden. Der Dienst ist vorübergehend überlastet oder der Radius ist zu klein. Warten Sie eine Minute und versuchen Sie es erneut, oder vergrößern Sie den Radius."
   },
   "story": {
     "myStory": "Meine Story",
@@ -1124,7 +1136,15 @@
     "titleFor": "Beiträge für {{place}} und Umgebung",
     "rangeLabel": "Umkreis",
     "categoriesLabel": "Kategorien",
-    "from": "von {{place}}"
+    "from": "von {{place}}",
+    "hintTitle": "Was ist hier los?",
+    "hintBody": "Hier siehst du Beiträge und Events anderer Reisender rund um die Kartenmitte. Wähle eine Reichweite und optional eine Kategorie und stöbere in den Ergebnissen.",
+    "hintOk": "Verstanden",
+    "helpLabel": "Hilfe",
+    "allCategories": "Alle Kategorien",
+    "searchCategories": "Kategorie suchen…",
+    "clearCats": "Auswahl löschen",
+    "resultsCount": "Ergebnisse: {{count}}"
   },
   "media": {
     "permissionNeeded": "Berechtigung erforderlich",
@@ -1154,5 +1174,20 @@
     "s7Body": "Folge den Menschen und Kategorien, die dich interessieren. Die Glocke meldet Neues in deiner Nähe.",
     "sectionTitle": "Anleitung",
     "sectionDesc": "Ein kurzer Überblick über VARA — sieben Schritte."
+  },
+  "verifyEmail": {
+    "title": "E-Mail bestätigen",
+    "subtitle": "Wir haben einen 6-stelligen Code an {{email}} gesendet",
+    "codeLabel": "6-stelliger Code",
+    "verifyBtn": "E-Mail bestätigen",
+    "resend": "Neuen Code senden",
+    "resendIn": "Erneut senden in {{s}} s",
+    "resent": "Ein neuer Code wurde an Ihre E-Mail gesendet.",
+    "checkSpam": "Wenn Sie die Nachricht nicht sehen, prüfen Sie Ihren Spam-Ordner.",
+    "successTitle": "E-Mail bestätigt ✅",
+    "successDesc": "Ihr Konto ist bereit. Bitte melden Sie sich an.",
+    "invalidCode": "Der Code ist falsch oder abgelaufen.",
+    "enterCode": "Geben Sie den 6-stelligen Code ein",
+    "backToLogin": "← Zurück zur Anmeldung"
   }
 }

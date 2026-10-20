@@ -9,7 +9,6 @@ import {
   Image,
   KeyboardAvoidingView,
   Platform,
-  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
@@ -25,6 +24,11 @@ import { setSentryUser } from "./config/sentry";
 import * as Linking from "expo-linking";
 import { API_BASE_URL } from "./config/api";
 import { T } from "../styles/varaTheme";
+import { KeyboardSafeScrollView } from "../components/KeyboardSafeScrollView";
+import { setToken } from "@/utils/tokenStore";
+import { apiFetch, describeNetworkError } from "@/utils/apiFetch";
+import { A } from "../styles/authTheme";
+import { Ionicons } from "@expo/vector-icons";
 
 // ─── Stiliziran VARA natpis ───────────────────────────────────────────────────
 function VaraWordmark() {
@@ -84,13 +88,14 @@ function FormField(props: {
       <Text style={s.label}>{props.label.toUpperCase()}</Text>
       <View style={{ position: "relative", justifyContent: "center" }}>
         <TextInput
+          selectTextOnFocus
           style={[
             s.input,
             focused && s.inputFocused,
             showValid && s.inputValid,
           ]}
           placeholder={props.placeholder}
-          placeholderTextColor="#9AA9A7"
+          placeholderTextColor={A.placeholder}
           value={props.value}
           onChangeText={props.onChangeText}
           autoCapitalize={props.autoCapitalize ?? "sentences"}
@@ -131,14 +136,19 @@ export default function LoginScreen() {
     }
     setIsLoading(true);
     try {
-      const response = await fetch(API_ENDPOINTS.LOGIN, {
+      const response = await apiFetch(API_ENDPOINTS.LOGIN, {
         method: "POST",
+        auth: false,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username: username.trim(), password }),
       });
-      const data = await response.json();
-      if (response.ok) {
-        await AsyncStorage.setItem("token", data.token);
+      // Odgovor se čita oprezno: poslužitelj uz grešku zna vratiti HTML (502/503
+      // dok se Render budi ili pada) ili prazno tijelo (429). Prije je ovdje stajao
+      // goli response.json(), koji bi u tom slučaju bacio izuzetak — a on je
+      // završavao u catch-u kao "Provjeri internetsku vezu", iako je veza bila u redu.
+      const data = await response.json().catch(() => null);
+      if (response.ok && data) {
+        await setToken(data.token);
         await AsyncStorage.setItem("userId", data.userId.toString());
         // Da se u prijavama padova vidi pogađa li greška jednog korisnika
         // ili sve. Šalje se samo id — ni ime ni e-pošta.
@@ -155,11 +165,27 @@ export default function LoginScreen() {
           t("auth.welcomeMessage", { name: data.firstName }),
           [{ text: t("common.ok"), onPress: () => router.replace("/(tabs)") }],
         );
+      } else if (response.status === 403 && data?.code === "emailNotVerified") {
+        // Lozinka je točna, ali e-mail nije potvrđen: na ekran za unos koda
+        // (poslužitelj ga šalje na zahtjev, pa resend=1).
+        router.push({
+          pathname: "/verify-email",
+          params: { email: data.email ?? "", resend: "1" },
+        });
+      } else if (response.status === 429) {
+        Alert.alert(t("common.error"), t("common.tooManyRequests"));
+      } else if (response.status >= 500 || (response.ok && !data)) {
+        // Poslužitelj je dostupan, ali ne radi ispravno. Šifra statusa ide u poruku
+        // da se vidi je li 502/503 (poslužitelj ne radi) ili 500 (greška u kodu/bazi).
+        Alert.alert(
+          t("common.error"),
+          `${t("common.serverError")} (${response.status})`,
+        );
       } else {
         Alert.alert(t("common.error"), t("validation.invalidCredentials"));
       }
-    } catch {
-      Alert.alert(t("common.error"), t("common.networkError"));
+    } catch (err) {
+      Alert.alert(t("common.error"), describeNetworkError(err, t));
     } finally {
       setIsLoading(false);
     }
@@ -180,7 +206,7 @@ export default function LoginScreen() {
     >
       <StatusBar barStyle="light-content" backgroundColor={GREEN_DEEPEST} />
 
-      <ScrollView
+      <KeyboardSafeScrollView
         contentContainerStyle={s.scroll}
         keyboardShouldPersistTaps="handled"
         bounces={false}
@@ -192,11 +218,11 @@ export default function LoginScreen() {
             <LanguageSelector />
           </View>
           <Image
-            source={require("../assets/images/vara_icon.png")}
+            // Štit na prozirnoj pozadini (prije: zelena pločica s vidljivim rubom).
+            source={require("../assets/images/vara_logo.png")}
             style={{
-              width: isCompact ? 92 : 130,
-              height: isCompact ? 92 : 130,
-              borderRadius: 24,
+              width: isCompact ? 78 : 104,
+              height: isCompact ? 100 : 133,
             }}
             resizeMode="contain"
           />
@@ -210,7 +236,7 @@ export default function LoginScreen() {
 
           <FormField
             label={t("auth.username")}
-            placeholder="npr. ana_horvat"
+            placeholder={t("auth.usernamePlaceholder")}
             helperText={t("auth.usernameHelperLogin")}
             value={username}
             onChangeText={setUsername}
@@ -222,7 +248,7 @@ export default function LoginScreen() {
 
           <FormField
             label={t("auth.password")}
-            placeholder="Unesi lozinku"
+            placeholder={t("auth.passwordPlaceholder")}
             helperText={t("auth.passwordHelperLogin")}
             value={password}
             onChangeText={setPassword}
@@ -235,11 +261,11 @@ export default function LoginScreen() {
                 onPress={() => setShowPassword((v) => !v)}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
-                <Text
-                  style={{ fontSize: T.title, opacity: showPassword ? 1 : 0.5 }}
-                >
-                  👁️
-                </Text>
+                <Ionicons
+                  name={showPassword ? "eye" : "eye-off"}
+                  size={22}
+                  color={showPassword ? A.accent : A.textDim}
+                />
               </TouchableOpacity>
             }
           />
@@ -260,7 +286,7 @@ export default function LoginScreen() {
             activeOpacity={0.85}
           >
             {isLoading ? (
-              <ActivityIndicator color="#fff" />
+              <ActivityIndicator color={A.onPrimary} />
             ) : (
               <Text style={s.btnText}>{t("auth.loginBtn")}</Text>
             )}
@@ -280,7 +306,7 @@ export default function LoginScreen() {
             activeOpacity={0.8}
           >
             {isGoogleLoading ? (
-              <ActivityIndicator color={TEXT_DARK} />
+              <ActivityIndicator color={A.text} />
             ) : (
               <Text style={s.googleBtnText}>
                 {t("auth.continueWithGoogle")}
@@ -299,30 +325,26 @@ export default function LoginScreen() {
           </TouchableOpacity>
         </View>
 
-        <Text style={s.bottomNote}>{t("auth.loginTerms")}</Text>
-        {/* Oba ekrana su otprije pisala da korisnik prihvaća pravila
-            privatnosti, a pravila nisu postojala niti su bila dostupna.
-            Sada vode na stranicu koju poslužuje poslužitelj. */}
+        {/* Jedna rečenica koja je ujedno i poveznica na pravila privatnosti
+            (prije: ista rečenica pa još jednom "Pravila privatnosti" ispod). */}
         <Text
           style={[s.bottomNote, { textDecorationLine: "underline" }]}
           onPress={() => Linking.openURL(`${API_BASE_URL}/privacy.html`)}
+          accessibilityRole="link"
         >
-          {t("auth.privacyLink")}
+          {t("auth.loginTerms")}
         </Text>
-      </ScrollView>
+      </KeyboardSafeScrollView>
     </KeyboardAvoidingView>
   );
 }
 
 // ─── Boje ─────────────────────────────────────────────────────────────────────
-const GREEN_DEEPEST = "#0D2406";
-const GREEN_DARK = "#1B3F0E";
-const GREEN_MID = "#2D6418";
-const VALID_GREEN = "#4CAF50";
-const SILVER = "#9AA9A7";
-const SILVER_LIGHT = "#E8EEEE";
-const TEXT_DARK = "#142F09";
-const TEXT_MID = "#5C6765";
+const GREEN_DEEPEST = A.statusBar;
+const GREEN_DARK = A.bg;
+const VALID_GREEN = A.valid;
+const TEXT_DARK = A.text;
+const TEXT_MID = A.textDim;
 
 const s = StyleSheet.create({
   root: {
@@ -358,7 +380,9 @@ const s = StyleSheet.create({
 
   // Bijela kartica — ograničena širina na velikim (desktop/web/tablet) ekranima
   card: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: A.card,
+    borderWidth: 1,
+    borderColor: A.cardBorder,
     borderRadius: 24,
     padding: 28,
     width: "100%",
@@ -395,27 +419,27 @@ const s = StyleSheet.create({
     marginTop: 6,
   },
   input: {
-    backgroundColor: SILVER_LIGHT,
+    backgroundColor: A.inputBg,
     borderRadius: 12,
     borderWidth: 1.5,
-    borderColor: "#D1DADB",
+    borderColor: A.divider,
     paddingHorizontal: 16,
     paddingVertical: 14,
     fontSize: T.lead,
     color: TEXT_DARK,
   },
   inputFocused: {
-    borderColor: GREEN_MID,
-    backgroundColor: "#FFFFFF",
-    shadowColor: GREEN_MID,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
+    borderColor: A.focus,
+    backgroundColor: A.inputBgFocus,
+    shadowColor: A.focus,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.35,
     shadowRadius: 6,
     elevation: 2,
   },
   inputValid: {
     borderColor: VALID_GREEN,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: A.inputBgFocus,
   },
   validCheckmark: {
     position: "absolute",
@@ -441,29 +465,29 @@ const s = StyleSheet.create({
   },
   forgotText: {
     fontSize: T.meta,
-    color: GREEN_MID,
+    color: A.accent,
     fontWeight: "600",
   },
 
   // Gumbi
   btn: {
-    backgroundColor: GREEN_MID,
+    backgroundColor: A.primary,
     borderRadius: 14,
     paddingVertical: 16,
     alignItems: "center",
-    shadowColor: GREEN_DARK,
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 10,
     elevation: 6,
   },
   btnDisabled: {
-    backgroundColor: SILVER,
+    backgroundColor: A.primaryDisabled,
     shadowOpacity: 0,
     elevation: 0,
   },
   btnText: {
-    color: "#FFFFFF",
+    color: A.onPrimary,
     fontSize: T.lead,
     fontWeight: "700",
     letterSpacing: 0.5,
@@ -479,7 +503,7 @@ const s = StyleSheet.create({
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: "#E8EEEE",
+    backgroundColor: A.divider,
   },
   dividerText: {
     fontSize: T.meta,
@@ -496,8 +520,8 @@ const s = StyleSheet.create({
     paddingVertical: 16,
     marginBottom: 14,
     borderWidth: 1.5,
-    borderColor: "#D1DADB",
-    backgroundColor: "#FFFFFF",
+    borderColor: A.divider,
+    backgroundColor: A.inputBg,
   },
   googleBtnText: {
     fontSize: T.body,
@@ -509,12 +533,12 @@ const s = StyleSheet.create({
   outlineBtn: {
     borderRadius: 14,
     borderWidth: 2,
-    borderColor: GREEN_MID,
+    borderColor: A.accent,
     paddingVertical: 16,
     alignItems: "center",
   },
   outlineBtnText: {
-    color: GREEN_MID,
+    color: A.accent,
     fontSize: T.lead,
     fontWeight: "700",
     letterSpacing: 0.3,
@@ -523,7 +547,7 @@ const s = StyleSheet.create({
   // Dno
   bottomNote: {
     fontSize: T.caption,
-    color: "rgba(200,225,200,0.45)",
+    color: A.textDim,
     textAlign: "center",
     marginTop: 24,
     lineHeight: 17,

@@ -55,7 +55,10 @@
     "settings": "Impostazioni",
     "accept": "Accetta",
     "decline": "Rifiuta",
-    "comments": "Commenti"
+    "comments": "Commenti",
+    "unsavedChanges": "Hai modifiche non salvate",
+    "sessionExpired": "La sessione è scaduta. Accedi di nuovo.",
+    "requestTimeout": "La richiesta ha impiegato troppo. Controlla la connessione e riprova."
   },
   "auth": {
     "login": "Accesso",
@@ -160,7 +163,12 @@
     "successTitle": "Successo! ✅",
     "successDesc": "La password è stata cambiata. Accedi.",
     "invalidCode": "Il codice non è corretto o è scaduto.",
-    "backToLogin": "← Torna all'accesso"
+    "backToLogin": "← Torna all'accesso",
+    "resendNow": "Invia un nuovo codice",
+    "resendIn": "Invia di nuovo tra {{s}} s",
+    "resent": "È stato inviato un nuovo codice. Il codice precedente non è più valido.",
+    "changeEmail": "Usa un'altra e-mail",
+    "emailUnavailable": "Al momento non possiamo inviare l’e-mail con il codice. Riprova tra qualche minuto o contattaci."
   },
   "password": {
     "minLength": "Min. 6 caratteri",
@@ -377,11 +385,15 @@
     "reportFailed": "La segnalazione non è stata inviata. Controlla la connessione e riprova.",
     "members": "Membri",
     "emptyTitle": "Nessun luogo in quest'area",
-    "emptyBody": "Attiva altre categorie o riduci lo zoom per coprire un'area più ampia."
+    "emptyBody": "Attiva altre categorie o riduci lo zoom per coprire un'area più ampia.",
+    "filtersHint": "Scegli raggio, momento della giornata e categorie. La mappa si aggiorna quando chiudi il pannello.",
+    "searchCategories": "Cerca categoria…",
+    "noCategoryMatch": "Nessuna categoria con questo nome.",
+    "radiusUnit": "Raggio di ricerca: {{km}} km",
+    "hideCircle": "Nascondi cerchio"
   },
   "videos": {
     "title": "Video",
-    "members": "membri",
     "savedToBoxTitle": "Salvato nel Contenitore",
     "savedToBoxDesc": "Puoi rivedere questo video nel tuo profilo, nella sezione Contenitore.",
     "addedToWishlistTitle": "Aggiunto alla Lista dei desideri",
@@ -964,8 +976,6 @@
     "distanceFromAccommodation": "📏 Distanza dall'alloggio",
     "venueSelected": "Selezionato",
     "shareFailed": "Impossibile condividere il piano.",
-    "numberOfVenues": "Numero di opzioni offerte per categoria",
-    "minVenues": "min. {{count}} opzioni",
     "fetchingPlacesFrom": "Recupero luoghi reali da {{destination}}...",
     "destinationPlaceholder": "Città o luogo (es. Spalato)",
     "postalCode": "CAP",
@@ -1039,7 +1049,8 @@
     "actClub": "Serata fuori",
     "anonymous": "Utente anonimo",
     "travelFromPrevious": "{{min}} min dalla tappa precedente",
-    "firstStop": "Prima tappa"
+    "firstStop": "Prima tappa",
+    "noVenues": "Al momento non siamo riusciti a caricare i luoghi per questa città. Il servizio è temporaneamente sovraccarico o il raggio è troppo piccolo. Attendi un minuto e riprova, oppure aumenta il raggio."
   },
   "story": {
     "myStory": "La mia storia",
@@ -1125,7 +1136,15 @@
     "titleFor": "Post per {{place}} e dintorni",
     "rangeLabel": "Raggio",
     "categoriesLabel": "Categorie",
-    "from": "da {{place}}"
+    "from": "da {{place}}",
+    "hintTitle": "Cosa succede da queste parti?",
+    "hintBody": "Qui vedi i post e gli eventi di altri viaggiatori intorno al centro della mappa. Scegli un raggio e, se vuoi, una categoria, poi sfoglia i risultati.",
+    "hintOk": "Ho capito",
+    "helpLabel": "Aiuto",
+    "allCategories": "Tutte le categorie",
+    "searchCategories": "Cerca categoria…",
+    "clearCats": "Cancella selezione",
+    "resultsCount": "Risultati: {{count}}"
   },
   "media": {
     "permissionNeeded": "Autorizzazione necessaria",
@@ -1155,5 +1174,20 @@
     "s7Body": "Segui le persone e le categorie che ti interessano. La campanella ti avvisa quando c'è qualcosa di nuovo vicino a te.",
     "sectionTitle": "Guida",
     "sectionDesc": "Una breve panoramica di VARA — sette passaggi."
+  },
+  "verifyEmail": {
+    "title": "Conferma la tua e-mail",
+    "subtitle": "Abbiamo inviato un codice di 6 cifre a {{email}}",
+    "codeLabel": "Codice di 6 cifre",
+    "verifyBtn": "Conferma e-mail",
+    "resend": "Invia un nuovo codice",
+    "resendIn": "Invia di nuovo tra {{s}} s",
+    "resent": "Un nuovo codice è stato inviato alla tua e-mail.",
+    "checkSpam": "Se non vedi il messaggio, controlla la cartella spam.",
+    "successTitle": "E-mail confermata ✅",
+    "successDesc": "Il tuo account è pronto. Accedi.",
+    "invalidCode": "Il codice non è corretto o è scaduto.",
+    "enterCode": "Inserisci il codice di 6 cifre",
+    "backToLogin": "← Torna all'accesso"
   }
 }

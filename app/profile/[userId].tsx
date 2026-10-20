@@ -1,7 +1,6 @@
 // app/profile/[userId].tsx
 // Pregled profila drugog korisnika
 import { Ionicons } from "@expo/vector-icons";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useLocalSearchParams } from "expo-router";
 import { VideoView, useVideoPlayer } from "expo-video";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -29,6 +28,7 @@ import { useTheme } from "../../components/AdaptiveThemeProvider";
 import { API_BASE_URL } from "../config/api";
 import { getVara } from "../../styles/adaptiveVara";
 import { T } from "../../styles/varaTheme";
+import { getToken } from "@/utils/tokenStore";
 
 const PRESET_AVATARS: Record<string, any> = {
   "avatar:male": require("../../assets/images/avatar-male.png"),
@@ -300,7 +300,7 @@ export default function UserProfileScreen() {
   const loadProfile = async () => {
     setLoading(true);
     try {
-      const token = await AsyncStorage.getItem("token");
+      const token = await getToken();
 
       // 1. Dohvati profil korisnika
       const res = await fetch(
@@ -442,7 +442,7 @@ export default function UserProfileScreen() {
 
   // Follow / Unfollow / zahtjev za praćenje (privatni profili)
   const handleFollow = async () => {
-    const token = await AsyncStorage.getItem("token");
+    const token = await getToken();
     setFollowLoading(true);
 
     // Napomena: ranije su ovi pozivi ciljali /api/follow/follow/{id} i
@@ -519,7 +519,7 @@ export default function UserProfileScreen() {
 
   // Golden Star toggle
   const handleGoldenToggle = async () => {
-    const token = await AsyncStorage.getItem("token");
+    const token = await getToken();
     setGoldenLoading(true);
     try {
       if (!isGolden) {
@@ -587,7 +587,7 @@ export default function UserProfileScreen() {
 
   // Block / Unblock
   const handleBlock = async () => {
-    const token = await AsyncStorage.getItem("token");
+    const token = await getToken();
     if (!isBlocked) {
       Alert.alert(
         t("userProfile.blockUser"),
@@ -654,7 +654,7 @@ export default function UserProfileScreen() {
     if (!message.trim()) return;
     setSending(true);
     try {
-      const token = await AsyncStorage.getItem("token");
+      const token = await getToken();
       const res = await fetch(`${API_BASE_URL}/api/message/send`, {
         method: "POST",
         headers: {

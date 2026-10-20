@@ -40,7 +40,10 @@ import {
   placeCategories,
 } from "../app/services/locationService";
 import { T, pb } from "../styles/varaTheme";
+// Ikone (nove; stare viking kovanice su u LEGACY_ICONS, prekidač USE_LEGACY_ICONS).
+import { APP_ICONS } from "../constants/icons";
 import { useTheme } from "./AdaptiveThemeProvider";
+import { getToken } from "@/utils/tokenStore";
 
 // ---------------------------------------------------------------------------
 // Tipovi
@@ -172,24 +175,25 @@ const EMOJIS: Record<string, string> = {
 // Marker slike
 
 const MARKER_IMAGES: Record<string, any> = {
-  restaurant: require("../assets/images/restoran.png"),
-  cafe: require("../assets/images/kafic.png"),
-  club: require("../assets/images/disco.png"),
-  beach: require("../assets/images/plaza.png"),
-  landmark: require("../assets/images/znamenitost.png"),
-  opg: require("../assets/images/opg.png"),
-  accommodation: require("../assets/images/smjestaj.png"),
-  market: require("../assets/images/trznica.png"),
-  paintball: require("../assets/images/paintball.png"),
-  cinema: require("../assets/images/kino.png"),
-  park: require("../assets/images/park.png"),
-  escapeRoom: require("../assets/images/escape.png"),
-  museum: require("../assets/images/muzej.png"),
-  theater: require("../assets/images/kazaliste.png"),
-  mountain: require("../assets/images/planina.png"),
-  nationalPark: require("../assets/images/nacpark.png"),
-  cave: require("../assets/images/spilja.png"),
-  spa: require("../assets/images/toplica.png"),
+  restaurant: APP_ICONS.restaurant,
+  cafe: APP_ICONS.cafe,
+  club: APP_ICONS.club,
+  beach: APP_ICONS.beach,
+  landmark: APP_ICONS.landmark,
+  opg: APP_ICONS.opg,
+  accommodation: APP_ICONS.accommodation,
+  market: APP_ICONS.market,
+  paintball: APP_ICONS.paintball,
+  cinema: APP_ICONS.cinema,
+  park: APP_ICONS.park,
+  escapeRoom: APP_ICONS.escapeRoom,
+  museum: APP_ICONS.museum,
+  theater: APP_ICONS.theater,
+  mountain: APP_ICONS.mountain,
+  nationalPark: APP_ICONS.nationalPark,
+  cave: APP_ICONS.cave,
+  spa: APP_ICONS.spa,
+  other: APP_ICONS.other,
 };
 
 // ---------------------------------------------------------------------------
@@ -880,6 +884,9 @@ async function fetchVenuesNearCity(
 }> {
   const geocoded = known ?? (await geocodeCity(cityQuery));
   if (!geocoded) return { geocoded: null, venues: {} };
+  // Predmemorija se NE briše: dijeli je glavna karta, a ključ već sadrži
+  // koordinate, radijus i kategorije, pa stari zapisi ne smetaju. Brisanje je
+  // pri svakom planu bacalo i sve što je karta već učitala.
 
   const allCats = [
     "restaurant",
@@ -1410,6 +1417,20 @@ export function PlanMyDayModal({
 
   const [loadingStep, setLoadingStep] = useState(0);
   const loadingInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Generiranje: jedan pokušaj odjednom, i oznaka tekućeg pokušaja. Bez toga je
+  // drugi dodir (ili ponovno generiranje) pokretao paralelni upit, a prvi je
+  // interval za animaciju učitavanja ostajao živ zauvijek — modal se tada
+  // ponovno iscrtavao svake 2 sekunde i usporavao kartu i sve ostalo.
+  const generatingRef = useRef(false);
+  const generationIdRef = useRef(0);
+
+  useEffect(
+    () => () => {
+      generationIdRef.current++;
+      if (loadingInterval.current) clearInterval(loadingInterval.current);
+    },
+    [],
+  );
   const [localVisitedIds, setLocalVisitedIds] = useState<Set<string>>(
     new Set(),
   );
@@ -1621,6 +1642,9 @@ export function PlanMyDayModal({
     setDestination("");
     setDestCoords(null);
     setNumDays(1);
+    // Zatvaranje prekida tekuće generiranje: njegov kasni odgovor se odbacuje.
+    generationIdRef.current++;
+    generatingRef.current = false;
     if (loadingInterval.current) clearInterval(loadingInterval.current);
   };
 
@@ -1663,7 +1687,7 @@ export function PlanMyDayModal({
       // pucalo jer je ruta /api/plan-ratings namjerno dostupna i bez
       // prijave — samo se tiho gubilo tko je ocijenio.
       const [token, firstName, lastName] = await Promise.all([
-        AsyncStorage.getItem("token"),
+        getToken(),
         AsyncStorage.getItem("firstName"),
         AsyncStorage.getItem("lastName"),
       ]);
@@ -1709,7 +1733,7 @@ export function PlanMyDayModal({
       const reqId = ++suggestSeqRef.current;
       setSearchingLocation(true);
       try {
-        const token = await AsyncStorage.getItem("token");
+        const token = await getToken();
         const data = await fetchDestinationSuggestions(query, token);
         // Sporiji odgovor na ranije slovo ne smije prebrisati noviji.
         if (reqId !== suggestSeqRef.current) return;
@@ -1751,6 +1775,11 @@ export function PlanMyDayModal({
       return;
     }
 
+    // Već traje: drugi dodir ne smije pokrenuti paralelni upit.
+    if (generatingRef.current) return;
+    generatingRef.current = true;
+    const runId = ++generationIdRef.current;
+
     setLoadingStep(0);
     setStep("loading");
     const tPlan = Date.now();
@@ -1760,6 +1789,8 @@ export function PlanMyDayModal({
       );
     }
 
+    // Prethodni interval se uvijek ugasi prije novog (inače curi).
+    if (loadingInterval.current) clearInterval(loadingInterval.current);
     loadingInterval.current = setInterval(() => {
       setLoadingStep((prev) => (prev + 1) % LOADING_MESSAGES.length);
     }, 2000);
@@ -1784,6 +1815,9 @@ export function PlanMyDayModal({
         }),
       ]).finally(() => clearTimeout(budgetTimer));
 
+      // Modal je u međuvremenu zatvoren ili je pokrenut novi pokušaj.
+      if (runId !== generationIdRef.current) return;
+
       if (__DEV__) {
         console.log(
           `[plan] venues ready in ${Date.now() - tPlan}ms: ${Object.entries(
@@ -1793,6 +1827,21 @@ export function PlanMyDayModal({
             .join(" ")}`,
         );
       }
+
+      // Nema ni jednog mjesta: prije se ovdje ipak "gradio" prazan plan i
+      // prikazivao kao uspjeh. Najčešće je uzrok privremen (servisi s kojih se
+      // mjesta dohvaćaju su preopterećeni), pa korisnik dobiva jasan savjet i
+      // ostaje na formi da može odmah ponoviti.
+      if (!geocoded || Object.keys(venues).length === 0) {
+        if (loadingInterval.current) clearInterval(loadingInterval.current);
+        Alert.alert(
+          t("plan.destination"),
+          geocoded ? t("plan.noVenues") : t("plan.planError"),
+        );
+        setStep("form");
+        return;
+      }
+
       setAllVenues(venues);
       setGeocodedCoords(
         geocoded
@@ -1844,6 +1893,7 @@ export function PlanMyDayModal({
 
       setStep("result");
     } catch (err) {
+      if (runId !== generationIdRef.current) return;
       if (__DEV__) {
         console.log(
           `[plan] FAILED after ${Date.now() - tPlan}ms:`,
@@ -1853,6 +1903,9 @@ export function PlanMyDayModal({
       if (loadingInterval.current) clearInterval(loadingInterval.current);
       Alert.alert(t("common.error"), t("plan.planError"));
       setStep("form");
+    } finally {
+      // Samo tekući pokušaj otpušta "zaključavanje"; zastarjeli ga ne dira.
+      if (runId === generationIdRef.current) generatingRef.current = false;
     }
   }, [
     destination,
@@ -1862,9 +1915,12 @@ export function PlanMyDayModal({
     interests,
     spontaneous,
     numDays,
+    // planStyle je nedostajao: povratni poziv je pamtio STARI stil pa je plan
+    // bio generiran s prethodno odabranim, a ne s trenutnim.
     planStyle,
     transport,
     userLocation,
+    t,
   ]);
 
   /**
@@ -2812,6 +2868,7 @@ export function PlanMyDayModal({
                   style={{ position: "relative", justifyContent: "center" }}
                 >
                   <TextInput
+                    selectTextOnFocus
                     style={{
                       backgroundColor: DC.card,
                       borderRadius: 12,
@@ -2985,17 +3042,17 @@ export function PlanMyDayModal({
                   {[
                     {
                       val: "opusteno" as PlanStyle,
-                      emoji: "😎",
+                      icon: APP_ICONS.styleRelaxed,
                       label: t("plan.styleRelaxed"),
                     },
                     {
                       val: "kulturno" as PlanStyle,
-                      emoji: "🧐",
+                      icon: APP_ICONS.styleCultural,
                       label: t("plan.styleCultural"),
                     },
                     {
                       val: "avantura" as PlanStyle,
-                      emoji: "🤩",
+                      icon: APP_ICONS.styleAdventure,
                       label: t("plan.styleAdventure"),
                     },
                   ].map((o) => (
@@ -3014,9 +3071,11 @@ export function PlanMyDayModal({
                       }}
                       onPress={() => setPlanStyle(o.val)}
                     >
-                      <Text style={{ fontSize: T.screen, marginBottom: 4 }}>
-                        {o.emoji}
-                      </Text>
+                      <Image
+                        source={o.icon}
+                        style={{ width: 44, height: 44, marginBottom: 6 }}
+                        resizeMode="contain"
+                      />
                       <Text
                         style={{
                           fontSize: T.meta,
@@ -3095,24 +3154,28 @@ export function PlanMyDayModal({
                       {[
                         {
                           val: "solo" as CompanionType,
+                          icon: APP_ICONS.solo,
                           label: t("plan.companionSolo"),
                           emoji: "🧍",
                           desc: t("plan.companionSoloDesc"),
                         },
                         {
                           val: "partner" as CompanionType,
+                          icon: APP_ICONS.partner,
                           label: t("plan.companionPartner"),
                           emoji: "💑",
                           desc: t("plan.companionPartnerDesc"),
                         },
                         {
                           val: "prijatelji" as CompanionType,
+                          icon: APP_ICONS.prijatelji,
                           label: t("plan.companionFriends"),
                           emoji: "👯",
                           desc: t("plan.companionFriendsDesc"),
                         },
                         {
                           val: "obitelj" as CompanionType,
+                          icon: APP_ICONS.obitelj,
                           label: t("plan.companionFamily"),
                           emoji: "👨‍👩‍👧‍👦",
                           desc: t("plan.companionFamilyDesc"),
@@ -3139,7 +3202,17 @@ export function PlanMyDayModal({
                             )
                           }
                         >
-                          <Text style={{ fontSize: T.screen }}>{o.emoji}</Text>
+                          {o.icon ? (
+                            <Image
+                              source={o.icon}
+                              style={{ width: 40, height: 40 }}
+                              resizeMode="contain"
+                            />
+                          ) : (
+                            <Text style={{ fontSize: T.screen }}>
+                              {o.emoji}
+                            </Text>
+                          )}
                           <View style={{ flex: 1 }}>
                             <Text
                               style={{
@@ -3186,25 +3259,35 @@ export function PlanMyDayModal({
                       style={{ flexDirection: "row", gap: 6, flexWrap: "wrap" }}
                     >
                       {[
-                        { val: "auto" as TransportType, label: t("plan.car") },
+                        {
+                          val: "auto" as TransportType,
+                          label: t("plan.car"),
+                          icon: APP_ICONS.auto,
+                        },
                         {
                           val: "javni" as TransportType,
                           label: t("plan.public"),
+                          icon: APP_ICONS.javni,
                         },
                         {
                           val: "pjesice" as TransportType,
                           label: t("plan.walking"),
+                          icon: APP_ICONS.pjesice,
                         },
                         {
                           val: "bicikl" as TransportType,
                           label: t("plan.bicycle"),
+                          icon: APP_ICONS.bicikl,
                         },
                       ].map((o) => (
                         <TouchableOpacity
                           key={o.val}
                           style={{
-                            paddingHorizontal: 14,
-                            paddingVertical: 8,
+                            flexDirection: "row",
+                            alignItems: "center",
+                            gap: 8,
+                            paddingHorizontal: 12,
+                            paddingVertical: 6,
                             borderRadius: 8,
                             backgroundColor:
                               transport === o.val ? DC.cardHover : DC.bg,
@@ -3218,6 +3301,13 @@ export function PlanMyDayModal({
                             )
                           }
                         >
+                          {o.icon && (
+                            <Image
+                              source={o.icon}
+                              style={{ width: 28, height: 28 }}
+                              resizeMode="contain"
+                            />
+                          )}
                           <Text
                             style={{
                               fontSize: T.meta,
@@ -3261,6 +3351,7 @@ export function PlanMyDayModal({
                         €
                       </Text>
                       <TextInput
+                        selectTextOnFocus
                         style={{
                           flex: 1,
                           fontSize: T.lead,

@@ -55,7 +55,10 @@
     "settings": "Postavke",
     "accept": "Prihvati",
     "decline": "Odbij",
-    "comments": "Komentari"
+    "comments": "Komentari",
+    "unsavedChanges": "Imaš nespremljene promjene",
+    "sessionExpired": "Sesija je istekla. Prijavi se ponovno.",
+    "requestTimeout": "Zahtjev je predugo trajao. Provjeri vezu i pokušaj ponovno."
   },
   "auth": {
     "login": "Prijava",
@@ -160,7 +163,12 @@
     "successTitle": "Uspjeh! ✅",
     "successDesc": "Lozinka je promijenjena. Prijavite se.",
     "invalidCode": "Kod je neispravan ili istekao.",
-    "backToLogin": "← Povratak na prijavu"
+    "backToLogin": "← Povratak na prijavu",
+    "resendNow": "Pošalji novi kod",
+    "resendIn": "Ponovno slanje za {{s}} s",
+    "resent": "Poslan je novi kod. Prethodni kod više ne vrijedi.",
+    "changeEmail": "Upiši drugu e-mail adresu",
+    "emailUnavailable": "Trenutno ne možemo poslati e-mail s kodom. Pokušaj ponovno za nekoliko minuta ili nas kontaktiraj."
   },
   "validation": {
     "enterFirstName": "Molimo unesite svoje ime.",
@@ -362,7 +370,12 @@
     "reportSentBody": "Prijava je poslana adminu. Provjerit ćemo podatak.",
     "reportFailed": "Prijava nije poslana. Provjeri vezu i pokušaj ponovno.",
     "emptyTitle": "Nema mjesta u ovom području",
-    "emptyBody": "Uključi još kategorija ili odzumiraj kartu da zahvatiš šire područje."
+    "emptyBody": "Uključi još kategorija ili odzumiraj kartu da zahvatiš šire područje.",
+    "filtersHint": "Odaberi radijus, doba dana i kategorije. Karta se osvježi kad zatvoriš ploču.",
+    "searchCategories": "Traži kategoriju…",
+    "noCategoryMatch": "Nema kategorije s tim imenom.",
+    "radiusUnit": "Radijus pretrage: {{km}} km",
+    "hideCircle": "Sakrij krug"
   },
   "notif": {
     "unavailableTitle": "Obavijesti nisu dostupne",
@@ -1036,7 +1049,8 @@
     "actClub": "Noćni izlazak",
     "anonymous": "Anonimni korisnik",
     "travelFromPrevious": "{{min}} min od prethodne postaje",
-    "firstStop": "Prva postaja"
+    "firstStop": "Prva postaja",
+    "noVenues": "Za taj grad trenutno nismo uspjeli dohvatiti mjesta. Servis koji ih daje je privremeno preopterećen ili je radijus premalen. Pričekajte minutu pa pokušajte ponovno, ili povećajte radijus."
   },
   "story": {
     "myStory": "Moj story",
@@ -1122,7 +1136,15 @@
     "titleFor": "Objave za {{place}} i okolicu",
     "rangeLabel": "Domet",
     "categoriesLabel": "Kategorije",
-    "from": "od {{place}}"
+    "from": "od {{place}}",
+    "hintTitle": "Što se događa u ovom kraju?",
+    "hintBody": "Ovdje vidiš objave i događaje drugih putnika oko središta karte. Odaberi domet, a po želji i kategoriju, pa pregledaj rezultate.",
+    "hintOk": "Razumijem",
+    "helpLabel": "Pomoć",
+    "allCategories": "Sve kategorije",
+    "searchCategories": "Traži kategoriju…",
+    "clearCats": "Očisti odabir",
+    "resultsCount": "Rezultata: {{count}}"
   },
   "media": {
     "permissionNeeded": "Dozvola je potrebna",
@@ -1152,5 +1174,20 @@
     "s7Body": "Zaprati ljude i kategorije koje te zanimaju. Zvono javlja kad se u tvojoj blizini pojavi nešto novo.",
     "sectionTitle": "Vodič",
     "sectionDesc": "Kratki pregled onoga što VARA nudi — sedam koraka."
+  },
+  "verifyEmail": {
+    "title": "Potvrdite e-mail",
+    "subtitle": "Poslali smo 6-znamenkasti kod na {{email}}",
+    "codeLabel": "6-znamenkasti kod",
+    "verifyBtn": "Potvrdi e-mail",
+    "resend": "Pošalji novi kod",
+    "resendIn": "Ponovno slanje za {{s}} s",
+    "resent": "Novi kod je poslan na vaš e-mail.",
+    "checkSpam": "Ako ne vidite poruku, provjerite mapu s neželjenom poštom (spam).",
+    "successTitle": "E-mail potvrđen ✅",
+    "successDesc": "Vaš račun je spreman. Prijavite se.",
+    "invalidCode": "Kod je neispravan ili je istekao.",
+    "enterCode": "Unesite 6-znamenkasti kod",
+    "backToLogin": "← Natrag na prijavu"
   }
 }

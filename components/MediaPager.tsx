@@ -91,21 +91,91 @@ function PagerPage({
   }, [isActive, item.isVideo, player]);
 
   return (
-    <View style={{ width, height, justifyContent: "center" }}>
-      {item.isVideo ? (
-        <VideoView
-          player={player}
-          style={{ width, height }}
-          contentFit="contain"
-          nativeControls
-        />
-      ) : (
-        <Image
-          source={{ uri: item.url }}
-          style={{ width, height }}
-          resizeMode="contain"
-        />
-      )}
+    <View style={{ width, height }}>
+      {/* Okvir u Vara stilu: zaobljen, zelenog ruba, nikad crna ploha. */}
+      <View
+        style={{
+          flex: 1,
+          marginHorizontal: 14,
+          marginTop: 4,
+          borderRadius: 22,
+          overflow: "hidden",
+          borderWidth: 1.5,
+          borderColor: "#4A7040",
+          backgroundColor: "#16301a",
+        }}
+      >
+        {item.isVideo ? (
+          <VideoView
+            player={player}
+            style={{ flex: 1 }}
+            contentFit="contain"
+            nativeControls
+          />
+        ) : (
+          <>
+            {/* Zamućena kopija iste slike puni prazan prostor oko nje
+                (panorame i uski kadrovi), umjesto crnih traka. */}
+            <Image
+              source={{ uri: item.url }}
+              blurRadius={28}
+              resizeMode="cover"
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                opacity: 0.55,
+              }}
+            />
+            <View
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: "rgba(18,37,14,0.45)",
+              }}
+            />
+            <Image
+              source={{ uri: item.url }}
+              style={{ flex: 1 }}
+              resizeMode="contain"
+            />
+          </>
+        )}
+      </View>
+
+      <View style={{ paddingHorizontal: 20, paddingTop: 12, minHeight: 66 }}>
+        {!!item.title && (
+          <Text
+            style={{ color: "#E8EDE4", fontSize: T.lead, fontWeight: "800" }}
+            numberOfLines={2}
+          >
+            {item.title}
+          </Text>
+        )}
+        {!!item.location && (
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 5,
+              marginTop: 3,
+            }}
+          >
+            <Ionicons name="location-outline" size={14} color="#97A192" />
+            <Text
+              style={{ flex: 1, color: "#97A192", fontSize: T.meta }}
+              numberOfLines={1}
+            >
+              {item.location}
+            </Text>
+          </View>
+        )}
+      </View>
     </View>
   );
 }
@@ -254,11 +324,12 @@ export function MediaPager({
   onDelete?: (item: PagerItem) => void;
 }) {
   const { t } = useTranslation();
-  const { width, height } = useWindowDimensions();
+  const { width } = useWindowDimensions();
   const listRef = useRef<FlatList<PagerItem>>(null);
 
   const [index, setIndex] = useState(initialIndex);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [bodyH, setBodyH] = useState(0);
 
   useEffect(() => {
     if (visible) {
@@ -272,8 +343,8 @@ export function MediaPager({
   return (
     <Modal visible={visible} animationType="fade" onRequestClose={onClose}>
       <SafeAreaView
-        style={{ flex: 1, backgroundColor: "#000" }}
-        edges={["top"]}
+        style={{ flex: 1, backgroundColor: "#12250E" }}
+        edges={["top", "bottom"]}
       >
         <View
           style={{
@@ -284,11 +355,24 @@ export function MediaPager({
             paddingVertical: 10,
           }}
         >
-          <Text style={{ color: "#fff", fontSize: T.body, fontWeight: "700" }}>
-            {items.length > 0 ? `${index + 1} / ${items.length}` : ""}
-          </Text>
+          <View
+            style={{
+              paddingHorizontal: 12,
+              paddingVertical: 5,
+              borderRadius: 14,
+              backgroundColor: "#243B1E",
+              borderWidth: 1,
+              borderColor: "#4A7040",
+            }}
+          >
+            <Text
+              style={{ color: "#E8EDE4", fontSize: T.meta, fontWeight: "800" }}
+            >
+              {items.length > 0 ? `${index + 1} / ${items.length}` : ""}
+            </Text>
+          </View>
 
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 16 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
             {/* Podaci o objavi. Otvaraju se preko slike, pa ih duljina
                 opisa ne može istjerati ispod ruba ekrana. */}
             <TouchableOpacity
@@ -296,8 +380,18 @@ export function MediaPager({
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
               accessibilityRole="button"
               accessibilityLabel={t("pager.detailsTitle")}
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 18,
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: "#243B1E",
+                borderWidth: 1.5,
+                borderColor: "#B8A060",
+              }}
             >
-              <Ionicons name="information-circle" size={24} color="#fff" />
+              <Ionicons name="information" size={20} color="#B8A060" />
             </TouchableOpacity>
 
             {onDelete && current && (
@@ -311,38 +405,70 @@ export function MediaPager({
               </TouchableOpacity>
             )}
 
-            <CloseButton onPress={onClose} tone="onBlack" />
+            <CloseButton onPress={onClose} tone="light" />
           </View>
         </View>
 
-        <FlatList
-          ref={listRef}
-          data={items}
-          keyExtractor={(it) => String(it.id)}
-          horizontal
-          pagingEnabled
-          showsHorizontalScrollIndicator={false}
-          initialScrollIndex={initialIndex}
-          // Bez getItemLayout initialScrollIndex na dugačkim popisima
-          // promaši stranicu, jer FlatList još ne zna koliko je koja široka.
-          getItemLayout={(_, i) => ({
-            length: width,
-            offset: width * i,
-            index: i,
-          })}
-          onMomentumScrollEnd={(e) => {
-            const next = Math.round(e.nativeEvent.contentOffset.x / width);
-            if (next !== index) setIndex(next);
-          }}
-          renderItem={({ item, index: i }) => (
-            <PagerPage
-              item={item}
-              isActive={i === index}
-              width={width}
-              height={height}
+        {/* Visina stranice = stvarno slobodno mjesto, ne cijeli ekran. */}
+        <View
+          style={{ flex: 1 }}
+          onLayout={(e) => setBodyH(Math.round(e.nativeEvent.layout.height))}
+        >
+          {bodyH > 0 && (
+            <FlatList
+              ref={listRef}
+              data={items}
+              keyExtractor={(it) => String(it.id)}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              initialScrollIndex={initialIndex}
+              // Bez getItemLayout initialScrollIndex na dugačkim popisima
+              // promaši stranicu, jer FlatList još ne zna koliko je koja široka.
+              getItemLayout={(_, i) => ({
+                length: width,
+                offset: width * i,
+                index: i,
+              })}
+              onMomentumScrollEnd={(e) => {
+                const next = Math.round(e.nativeEvent.contentOffset.x / width);
+                if (next !== index) setIndex(next);
+              }}
+              renderItem={({ item, index: i }) => (
+                <PagerPage
+                  item={item}
+                  isActive={i === index}
+                  width={width}
+                  height={bodyH}
+                />
+              )}
             />
           )}
-        />
+        </View>
+
+        {/* Točkice: gdje sam u nizu (za dugačke nizove ih nema — brojač je gore). */}
+        {items.length > 1 && items.length <= 12 && (
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "center",
+              gap: 6,
+              paddingVertical: 10,
+            }}
+          >
+            {items.map((it, i) => (
+              <View
+                key={String(it.id)}
+                style={{
+                  width: i === index ? 20 : 7,
+                  height: 7,
+                  borderRadius: 4,
+                  backgroundColor: i === index ? "#B8A060" : "#4A7040",
+                }}
+              />
+            ))}
+          </View>
+        )}
 
         <DetailsSheet
           item={current}

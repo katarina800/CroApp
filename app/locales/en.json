@@ -55,7 +55,10 @@
     "settings": "Settings",
     "accept": "Accept",
     "decline": "Decline",
-    "comments": "Comments"
+    "comments": "Comments",
+    "unsavedChanges": "You have unsaved changes",
+    "sessionExpired": "Your session has expired. Please sign in again.",
+    "requestTimeout": "The request took too long. Check your connection and try again."
   },
   "auth": {
     "login": "Login",
@@ -160,7 +163,12 @@
     "successTitle": "Success! ✅",
     "successDesc": "Your password has been changed. Please log in.",
     "invalidCode": "The code is incorrect or has expired.",
-    "backToLogin": "← Back to login"
+    "backToLogin": "← Back to login",
+    "resendNow": "Send a new code",
+    "resendIn": "Send again in {{s}} s",
+    "resent": "A new code has been sent. The previous code no longer works.",
+    "changeEmail": "Use a different email",
+    "emailUnavailable": "We cannot send the code email right now. Please try again in a few minutes or contact us."
   },
   "password": {
     "minLength": "Min. 6 characters",
@@ -381,7 +389,12 @@
     "reportSentBody": "Your report was sent to the admin. We'll check it.",
     "reportFailed": "The report was not sent. Check your connection and try again.",
     "emptyTitle": "No places in this area",
-    "emptyBody": "Turn on more categories, or zoom out to cover a wider area."
+    "emptyBody": "Turn on more categories, or zoom out to cover a wider area.",
+    "filtersHint": "Choose a radius, time of day and categories. The map refreshes when you close this panel.",
+    "searchCategories": "Search categories…",
+    "noCategoryMatch": "No category with that name.",
+    "radiusUnit": "Search radius: {{km}} km",
+    "hideCircle": "Hide circle"
   },
   "videos": {
     "title": "Videos",
@@ -938,8 +951,6 @@
     "distanceFromAccommodation": "📏 Distance from accommodation",
     "venueSelected": "Selected",
     "shareFailed": "Unable to share plan.",
-    "numberOfVenues": "Number of options offered per category",
-    "minVenues": "min. {{count}} options",
     "destination": "Destination",
     "fetchingPlacesFrom": "Fetching real places from {{destination}}...",
     "destinationPlaceholder": "City or place (e.g. Split)",
@@ -1014,7 +1025,8 @@
     "actClub": "Night out",
     "anonymous": "Anonymous user",
     "travelFromPrevious": "{{min}} min from the previous stop",
-    "firstStop": "First stop"
+    "firstStop": "First stop",
+    "noVenues": "We couldn't load places for that city right now. The service that provides them is temporarily busy, or the radius is too small. Wait a minute and try again, or increase the radius."
   },
   "schedBreakfast": "Breakfast",
   "schedMorningTour": "Morning sightseeing — least tourist traffic",
@@ -1124,7 +1136,15 @@
     "titleFor": "Posts for {{place}} and the surrounding area",
     "rangeLabel": "Range",
     "categoriesLabel": "Categories",
-    "from": "from {{place}}"
+    "from": "from {{place}}",
+    "hintTitle": "What is happening around here?",
+    "hintBody": "See posts and events from other travellers around the centre of the map. Pick a range and, if you like, a category, then browse the results.",
+    "hintOk": "Got it",
+    "helpLabel": "Help",
+    "allCategories": "All categories",
+    "searchCategories": "Search categories…",
+    "clearCats": "Clear selection",
+    "resultsCount": "Results: {{count}}"
   },
   "media": {
     "permissionNeeded": "Permission needed",
@@ -1154,5 +1174,20 @@
     "s7Body": "Follow the people and categories you care about. The bell tells you when something new appears nearby.",
     "sectionTitle": "Tutorial",
     "sectionDesc": "A short tour of what VARA can do — seven steps."
+  },
+  "verifyEmail": {
+    "title": "Confirm your email",
+    "subtitle": "We sent a 6-digit code to {{email}}",
+    "codeLabel": "6-digit code",
+    "verifyBtn": "Confirm email",
+    "resend": "Send a new code",
+    "resendIn": "Send again in {{s}} s",
+    "resent": "A new code has been sent to your email.",
+    "checkSpam": "If you don't see the email, check your spam/junk folder.",
+    "successTitle": "Email confirmed ✅",
+    "successDesc": "Your account is ready. Please log in.",
+    "invalidCode": "The code is incorrect or has expired.",
+    "enterCode": "Enter the 6-digit code",
+    "backToLogin": "← Back to login"
   }
 }

@@ -10,6 +10,7 @@
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { API_BASE_URL } from "../app/config/api";
+import { getToken } from "@/utils/tokenStore";
 
 export interface AppNotification {
   id: number;
@@ -47,7 +48,7 @@ export interface NotificationPreferences {
 const BASE = `${API_BASE_URL}/api/notification`;
 
 async function authHeaders(): Promise<Record<string, string> | null> {
-  const token = await AsyncStorage.getItem("token");
+  const token = await getToken();
   if (!token) return null;
   return { Authorization: `Bearer ${token}` };
 }

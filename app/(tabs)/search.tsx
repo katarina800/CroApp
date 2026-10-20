@@ -43,6 +43,7 @@ const PRESET_AVATARS: Record<string, any> = {
 import { getVara } from "../../styles/adaptiveVara";
 import { T, V as VARA } from "../../styles/varaTheme";
 import { StateView } from "../../components/StateView";
+import { getToken } from "@/utils/tokenStore";
 
 const V = {
   bg: VARA.forestDeep,
@@ -198,7 +199,7 @@ function ComposeMessageModal({
     if (!recipient || !message.trim()) return;
     setSending(true);
     try {
-      const token = await AsyncStorage.getItem("token");
+      const token = await getToken();
       const res = await fetch(`${API_BASE_URL}/api/message/send`, {
         method: "POST",
         headers: {
@@ -483,7 +484,7 @@ export default function SearchScreen() {
 
   const loadData = async (silent = false) => {
     try {
-      const token = await AsyncStorage.getItem("token");
+      const token = await getToken();
       const storedId = await AsyncStorage.getItem("userId");
       const parsedId = parseInt(storedId || "0");
       if (storedId) setCurrentUserId(parsedId);
@@ -591,7 +592,7 @@ export default function SearchScreen() {
   }, [query, users]);
 
   const handleFollow = async (userId: number) => {
-    const token = await AsyncStorage.getItem("token");
+    const token = await getToken();
     const isFollowing = followingMap[userId];
     const isPending = pendingMap[userId];
     setLoadingFollow((p) => ({ ...p, [userId]: true }));
@@ -765,6 +766,7 @@ export default function SearchScreen() {
             style={{ marginRight: 8 }}
           />
           <TextInput
+            selectTextOnFocus
             style={styles.searchInput}
             placeholder={t("search.placeholder")}
             placeholderTextColor={V.placeholder}

@@ -26,6 +26,13 @@ export const API_ENDPOINTS = {
   COMPLETE_PROFILE: `${API_BASE_URL}/api/auth/complete-profile`,
   SET_PASSWORD: `${API_BASE_URL}/api/auth/set-password`,
   UPDATE_LANGUAGE: `${API_BASE_URL}/api/auth/language`,
+  VERIFY_EMAIL: `${API_BASE_URL}/api/auth/verify-email`,
+  RESEND_VERIFICATION: `${API_BASE_URL}/api/auth/resend-verification`,
+  FORGOT_PASSWORD: `${API_BASE_URL}/api/auth/forgot-password`,
+  VERIFY_RESET_CODE: `${API_BASE_URL}/api/auth/verify-reset-code`,
+  RESET_PASSWORD: `${API_BASE_URL}/api/auth/reset-password`,
+  // 204 dok je prijava valjana, 401 kad je poništena (npr. reset lozinke).
+  SESSION: `${API_BASE_URL}/api/auth/session`,
 
   // VIDEO
   VIDEOS: `${API_BASE_URL}/api/video`,

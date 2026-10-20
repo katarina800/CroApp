@@ -18,6 +18,7 @@ import { useTranslation } from "react-i18next";
 import {
   FlatList,
   Image,
+  ImageSourcePropType,
   Modal,
   ScrollView,
   Text,
@@ -28,6 +29,8 @@ import {
 
 import { useTheme } from "./AdaptiveThemeProvider";
 import { T, V } from "../styles/varaTheme";
+// Ikone doba dana (nove; stare viking kovanice su u LEGACY_ICONS, prekidač USE_LEGACY_ICONS).
+import { APP_ICONS } from "../constants/icons";
 
 /**
  * Vodič se otvara preko cijelog ekrana, pa mora pratiti odabranu temu —
@@ -76,9 +79,9 @@ const STORAGE_KEY = "vara_tutorial_seen_v1";
  */
 type Step = {
   /** Glavna slika iz aplikacije. */
-  image?: number;
+  image?: ImageSourcePropType;
   /** Manje ikone ispod glavne; isti izvor kao u aplikaciji. */
-  extras?: number[];
+  extras?: ImageSourcePropType[];
   /** Gumb "+" kakav stoji u Videima. */
   plusButton?: boolean;
   /** Zastavice — aplikacija jezike i inače prikazuje njima. */
@@ -88,16 +91,16 @@ type Step = {
   bodyKey: string;
 };
 
-const MAP_ICON = require("../assets/images/karta.png");
-const VIDEO_ICON = require("../assets/images/video.png");
-const NOTIF_ICON = require("../assets/images/obav.png");
-const PLAN_ICON = require("../assets/images/put.png");
-const VISITED_ICON = require("../assets/images/posmjesta.png");
-const BADGES_ICON = require("../assets/images/uspjeh.png");
-const RADIUS_ICON = require("../assets/images/radijus.png");
-const MORNING_ICON = require("../assets/images/jutro.png");
-const AFTERNOON_ICON = require("../assets/images/popodne.png");
-const EVENING_ICON = require("../assets/images/vecer.png");
+const MAP_ICON = APP_ICONS.navMap as ImageSourcePropType;
+const VIDEO_ICON = APP_ICONS.navVideo as ImageSourcePropType;
+const NOTIF_ICON = APP_ICONS.notifications as ImageSourcePropType;
+const PLAN_ICON = APP_ICONS.planDay as ImageSourcePropType;
+const VISITED_ICON = APP_ICONS.visited as ImageSourcePropType;
+const BADGES_ICON = APP_ICONS.badges as ImageSourcePropType;
+const RADIUS_ICON = APP_ICONS.radius as ImageSourcePropType;
+const MORNING_ICON = APP_ICONS.jutro as ImageSourcePropType;
+const AFTERNOON_ICON = APP_ICONS.poslijepodne as ImageSourcePropType;
+const EVENING_ICON = APP_ICONS.vecer as ImageSourcePropType;
 
 const STEPS: Step[] = [
   {

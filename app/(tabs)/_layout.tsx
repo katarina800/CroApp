@@ -5,9 +5,11 @@ import { useCallback, useEffect, useState } from "react";
 import { Alert, AppState, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import BottomNav from "../../components/BottomNav";
+import { API_ENDPOINTS } from "../config/api";
 import i18n, { languageReady } from "../config/i18n";
 import { clearSession, isTokenExpired } from "../../utils/session";
 import { TutorialModal, hasSeenTutorial } from "../../components/TutorialModal";
+import { getToken } from "@/utils/tokenStore";
 
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
@@ -24,8 +26,24 @@ export default function TabsLayout() {
   // su podaci nestali: nula pratitelja, nema poruka, nema videa. Umjesto
   // toga korisnika se pošalje na prijavu i kaže mu se zašto.
   const checkSession = useCallback(async () => {
-    const token = await AsyncStorage.getItem("token");
-    if (!isTokenExpired(token)) return;
+    const token = await getToken();
+    if (!token) return;
+
+    let revoked = false;
+    if (!isTokenExpired(token)) {
+      // Rok nije istekao, ali poslužitelj može poništiti prijavu ranije: reset
+      // lozinke odjavljuje sve uređaje. Greška mreže se ignorira (offline nije
+      // odjava); samo izričit 401 znači da prijava više ne vrijedi.
+      try {
+        const res = await fetch(API_ENDPOINTS.SESSION, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        revoked = res.status === 401;
+      } catch {
+        revoked = false;
+      }
+      if (!revoked) return;
+    }
 
     await clearSession();
 
