@@ -1229,12 +1229,17 @@ const PLAN_MAP_STYLE = [
   },
 ];
 
+// Okrugle ikone-gumbi na karti umjesto tekstualnih "pilula": natpisi
+// ("Ti i postaja", "Sve postaje") zauzimali su četvrtinu karte i nisu bili
+// jasni. Značenje ostaje u accessibilityLabel.
 const mapPill = (isDark: boolean) =>
   ({
     backgroundColor: isDark ? "rgba(20,30,20,0.92)" : "rgba(255,255,255,0.95)",
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
     shadowColor: "#000",
     shadowOpacity: 0.18,
     shadowRadius: 4,
@@ -1243,7 +1248,7 @@ const mapPill = (isDark: boolean) =>
 
 const mapPillText = (isDark: boolean) =>
   ({
-    fontSize: T.meta,
+    fontSize: T.lead,
     fontWeight: "700",
     color: isDark ? "#e8e8e8" : "#1a2a18",
   }) as const;
@@ -2913,7 +2918,7 @@ export function PlanMyDayModal({
                     marginBottom: 6,
                   }}
                 >
-                  {t("plan.whereGoing")}?
+                  {t("plan.whereGoing")}
                 </Text>
                 <View
                   style={{ position: "relative", justifyContent: "center" }}
@@ -3019,7 +3024,7 @@ export function PlanMyDayModal({
                       marginBottom: 10,
                     }}
                   >
-                    {t("plan.howManyDays")}?
+                    {t("plan.howManyDays")}
                   </Text>
                   <View
                     style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}
@@ -3087,7 +3092,7 @@ export function PlanMyDayModal({
                     marginBottom: 10,
                   }}
                 >
-                  {t("plan.tripStyle")}?
+                  {t("plan.tripStyle")}
                 </Text>
                 <View style={{ flexDirection: "row", gap: 8 }}>
                   {[
@@ -3199,7 +3204,7 @@ export function PlanMyDayModal({
                         marginBottom: 8,
                       }}
                     >
-                      {t("plan.withWhom")}?
+                      {t("plan.withWhom")}
                     </Text>
                     <View style={{ gap: 8 }}>
                       {[
@@ -3766,20 +3771,20 @@ export function PlanMyDayModal({
                       <TouchableOpacity
                         onPress={() => focusOn(focusTarget)}
                         style={mapPill(isDark)}
+                        accessibilityRole="button"
+                        accessibilityLabel={t("plan.showMeAndStop")}
                       >
-                        <Text style={mapPillText(isDark)}>
-                          🎯 {t("plan.showMeAndStop")}
-                        </Text>
+                        <Text style={mapPillText(isDark)}>◎</Text>
                       </TouchableOpacity>
                     )}
                     {activeDayActivities.length > 1 && (
                       <TouchableOpacity
                         onPress={fitWholeDay}
                         style={mapPill(isDark)}
+                        accessibilityRole="button"
+                        accessibilityLabel={t("plan.showAllStops")}
                       >
-                        <Text style={mapPillText(isDark)}>
-                          ⤢ {t("plan.showAllStops")}
-                        </Text>
+                        <Text style={mapPillText(isDark)}>⤢</Text>
                       </TouchableOpacity>
                     )}
                   </View>
