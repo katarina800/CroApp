@@ -1032,6 +1032,7 @@
     "selectAccommodation": "Scegli l'indirizzo dell'alloggio per una visualizzazione più precisa",
     "selectBtn": "✓ Scegli questo luogo",
     "planError": "Impossibile generare il piano. Verifica la connessione.",
+    "placesUnavailable": "I servizi che forniscono i luoghi non rispondono al momento. Riprova tra un minuto.",
     "actLandmark": "Visita a un monumento",
     "actMuseum": "Visita al museo",
     "actMarket": "Giro al mercato",

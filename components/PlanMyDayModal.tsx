@@ -35,6 +35,7 @@ import { API_BASE_URL } from "../app/config/api"; // prilagodi putanju
 
 import {
   geocodeCity,
+  deduplicatePlaces,
   getPlacesInRadiusDetailed,
   Place,
   placeCategories,
@@ -43,6 +44,7 @@ import { T, pb } from "../styles/varaTheme";
 // Ikone (nove; stare viking kovanice su u LEGACY_ICONS, prekidač USE_LEGACY_ICONS).
 import { APP_ICONS } from "../constants/icons";
 import { useTheme } from "./AdaptiveThemeProvider";
+import { fetchGoogleNearby } from "@/app/services/googleNearby";
 import { getToken } from "@/utils/tokenStore";
 
 // ---------------------------------------------------------------------------
@@ -867,6 +869,13 @@ async function fetchDestinationSuggestions(
   }
 }
 
+const GOOGLE_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || "";
+/**
+ * Kad je Google već odgovorio, OpenStreetMap ima još toliko vremena da dopuni
+ * ono što Google nema (plaže, tržnice, kazališta…). Javni OSM poslužitelji su
+ * često preopterećeni; bez ovoga bi plan čekao njih i kad je Google odavno gotov.
+ */
+const OSM_GRACE_MS = 2500;
 /** Najdulje što korisnik čeka na plan; dulje od toga je bolja jasna greška i ponovni pokušaj. */
 const PLAN_FETCH_BUDGET_MS = 30000;
 
@@ -908,15 +917,51 @@ async function fetchVenuesNearCity(
     "paintball",
   ];
   const cats = interests.length > 0 ? interests : allCats;
-  const { places, failed } = await getPlacesInRadiusDetailed(
+  // Oba izvora se pitaju ISTODOBNO. Google odgovara za ~1 s; OpenStreetMap
+  // zna trajati i puno dulje ili ne odgovoriti.
+  const osmPromise = getPlacesInRadiusDetailed(
     geocoded.latitude,
     geocoded.longitude,
     radiusKm,
     cats as any,
-  );
-  // Izvor nije odgovorio, a nemamo ništa: to nije "grad bez mjesta", pa se
-  // korisniku kaže da pokuša ponovno umjesto da dobije prazan plan.
-  if (failed && places.length === 0) throw new Error("places-unavailable");
+  ).catch(() => ({ places: [] as Place[], failed: true }));
+
+  const googlePlaces = GOOGLE_KEY
+    ? await fetchGoogleNearby(
+        GOOGLE_KEY,
+        geocoded.latitude,
+        geocoded.longitude,
+        radiusKm * 1000,
+        cats,
+        true, // plan ne treba radno vrijeme — jeftiniji upit
+      ).catch(() => [] as Place[])
+    : [];
+
+  // Imamo li Googleove rezultate, OSM čeka samo kratko; inače ga čekamo do kraja.
+  let graceTimer: ReturnType<typeof setTimeout> | undefined;
+  const osm = await Promise.race([
+    osmPromise,
+    new Promise<null>((resolve) => {
+      graceTimer = setTimeout(
+        () => resolve(null),
+        googlePlaces.length > 0 ? OSM_GRACE_MS : PLAN_FETCH_BUDGET_MS - 5000,
+      );
+    }),
+  ]).finally(() => clearTimeout(graceTimer));
+
+  const places = deduplicatePlaces([...googlePlaces, ...(osm?.places ?? [])]);
+  places.sort((a, b) => (a.distance ?? 0) - (b.distance ?? 0));
+  // Nijedan izvor nije dao ništa, a barem jedan nije ni odgovorio: to nije
+  // "grad bez mjesta", pa se korisniku kaže da pokuša ponovno umjesto da
+  // dobije prazan plan.
+  if (places.length === 0 && (!osm || osm.failed)) {
+    throw new Error("places-unavailable");
+  }
+  if (__DEV__) {
+    console.log(
+      `[plan] sources: Google ${googlePlaces.length}, OSM ${osm ? osm.places.length + (osm.failed ? " (failed)" : "") : "not in time"}`,
+    );
+  }
 
   const venues: Record<string, VenueItem[]> = {};
   for (const p of places) {
@@ -1901,7 +1946,14 @@ export function PlanMyDayModal({
         );
       }
       if (loadingInterval.current) clearInterval(loadingInterval.current);
-      Alert.alert(t("common.error"), t("plan.planError"));
+      const slow =
+        err instanceof Error &&
+        (err.message === "places-unavailable" ||
+          err.message === "plan-timeout");
+      Alert.alert(
+        t("common.error"),
+        slow ? t("plan.placesUnavailable") : t("plan.planError"),
+      );
       setStep("form");
     } finally {
       // Samo tekući pokušaj otpušta "zaključavanje"; zastarjeli ga ne dira.
@@ -2017,7 +2069,6 @@ export function PlanMyDayModal({
             }}
           >
             {t("plan.findingPlaces", { destination })}
-            {__DEV__ ? "  · plan-v3 (max 30 s)" : ""}
           </Text>
         </View>
       </Modal>

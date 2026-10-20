@@ -1492,7 +1492,7 @@ function isValidOPG(tags: Record<string, string>, name: string): boolean {
  * Isto mjesto koje je stvarno i kafić i restoran sada se pojavljuje pod
  * obje kategorije — to nije duplikat, nego točan odgovor na oba filtra.
  */
-function deduplicatePlaces(places: Place[]): Place[] {
+export function deduplicatePlaces(places: Place[]): Place[] {
   const result: Place[] = [];
   for (const place of places) {
     const isDuplicate = result.some((existing) => {

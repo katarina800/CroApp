@@ -1008,6 +1008,7 @@
     "selectAccommodation": "Choose accommodation address for more precise display",
     "selectBtn": "✓ Select this place",
     "planError": "Unable to generate plan. Check your internet connection.",
+    "placesUnavailable": "The services that provide places are not responding right now. Please try again in a minute.",
     "actLandmark": "Sightseeing at a landmark",
     "actMuseum": "Museum visit",
     "actMarket": "Stroll through the market",

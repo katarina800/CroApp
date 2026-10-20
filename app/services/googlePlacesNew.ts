@@ -100,13 +100,18 @@ function toNewPlace(p: any): NewPlace | null {
   };
 }
 
-const NEARBY_FIELDS = [
+const NEARBY_FIELDS_LITE = [
   "places.id",
   "places.displayName",
   "places.location",
   "places.rating",
   "places.shortFormattedAddress",
   "places.businessStatus",
+].join(",");
+
+// Radno vrijeme spada u skuplji razred naplate, pa se traži samo kad treba.
+const NEARBY_FIELDS = [
+  NEARBY_FIELDS_LITE,
   "places.regularOpeningHours.weekdayDescriptions",
   "places.currentOpeningHours.openNow",
 ].join(",");
@@ -121,12 +126,14 @@ export async function nearbySearchNew(opts: {
   longitude: number;
   radiusM: number;
   includedTypes: string[];
+  /** Samo osnovna polja, bez radnog vremena (jeftinije). */
+  lite?: boolean;
   timeoutMs?: number;
 }): Promise<{ places: NewPlace[]; error?: string }> {
   const { data, error } = await post(
     "/places:searchNearby",
     opts.key,
-    NEARBY_FIELDS,
+    opts.lite ? NEARBY_FIELDS_LITE : NEARBY_FIELDS,
     {
       includedTypes: opts.includedTypes,
       maxResultCount: 20,

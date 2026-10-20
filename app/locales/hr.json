@@ -1032,6 +1032,7 @@
     "selectAccommodation": "Odaberite adresu smještaja za precizniji prikaz",
     "selectBtn": "✓ Odaberi ovo mjesto",
     "planError": "Nije moguće generirati plan. Provjeri internetsku vezu.",
+    "placesUnavailable": "Servisi s kojih dohvaćamo mjesta trenutno ne odgovaraju. Pokušaj ponovno za minutu.",
     "actLandmark": "Razgledavanje znamenitosti",
     "actMuseum": "Obilazak muzeja",
     "actMarket": "Obilazak tržnice",

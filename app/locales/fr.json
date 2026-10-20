@@ -1032,6 +1032,7 @@
     "selectAccommodation": "Choisissez l'adresse de l'hébergement pour un affichage plus précis",
     "selectBtn": "✓ Choisir ce lieu",
     "planError": "Impossible de générer le plan. Vérifiez votre connexion internet.",
+    "placesUnavailable": "Les services qui fournissent les lieux ne répondent pas pour le moment. Réessayez dans une minute.",
     "actLandmark": "Visite d'un monument",
     "actMuseum": "Visite du musée",
     "actMarket": "Balade au marché",

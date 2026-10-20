@@ -982,6 +982,7 @@
     "selectAccommodation": "Wählen Sie die Unterkunftsadresse für eine genauere Anzeige",
     "selectBtn": "✓ Diesen Ort auswählen",
     "planError": "Plan kann nicht generiert werden. Überprüfen Sie Ihre Internetverbindung.",
+    "placesUnavailable": "Die Dienste für Orte antworten gerade nicht. Bitte versuche es in einer Minute erneut.",
     "actLandmark": "Besichtigung einer Sehenswürdigkeit",
     "actMuseum": "Museumsbesuch",
     "actMarket": "Bummel über den Markt",
