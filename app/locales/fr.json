@@ -1056,7 +1056,11 @@
     "dayBudget": "budget du jour : {{budget}} €",
     "showMoreInterests": "Tout afficher",
     "showFewerInterests": "Moins",
-    "interestsSelected": "Sélectionnés : {{count}}"
+    "interestsSelected": "Sélectionnés : {{count}}",
+    "mapEnlarge": "Agrandir la carte",
+    "mapShrink": "Réduire la carte",
+    "mapReload": "Recharger la carte",
+    "noStopsFit": "Avec ces réglages, aucun lieu ne rentre dans le programme. Essaie un rayon plus grand, un budget plus élevé ou un autre transport — les lieux trouvés sont listés ci-dessous."
   },
   "story": {
     "myStory": "Mon story",

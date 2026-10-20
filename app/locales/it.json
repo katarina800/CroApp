@@ -1056,7 +1056,11 @@
     "dayBudget": "budget giornaliero: {{budget}} €",
     "showMoreInterests": "Mostra tutti",
     "showFewerInterests": "Meno",
-    "interestsSelected": "Selezionati: {{count}}"
+    "interestsSelected": "Selezionati: {{count}}",
+    "mapEnlarge": "Ingrandisci la mappa",
+    "mapShrink": "Riduci la mappa",
+    "mapReload": "Ricarica la mappa",
+    "noStopsFit": "Con queste impostazioni nessun luogo rientra nel programma. Prova un raggio più grande, un budget maggiore o un altro mezzo — i luoghi trovati sono elencati sotto."
   },
   "story": {
     "myStory": "La mia storia",

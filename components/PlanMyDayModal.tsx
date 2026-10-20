@@ -26,6 +26,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from "react-native";
 import MapView, { Marker, Polyline } from "react-native-maps";
@@ -874,6 +875,26 @@ export function PlanMyDayModal({
     type?: string;
   } | null>(null);
   const [mapReady, setMapReady] = useState(false);
+  // Karta plana: veličina ovisi o ekranu (prije fiksnih 320 px, premalo na
+  // većim telefonima), a može se i povećati. Ako Google pločice ne stignu u
+  // nekoliko sekundi (sporo / prazna siva karta), nudi se ponovno učitavanje.
+  const { height: windowHeight } = useWindowDimensions();
+  const [mapExpanded, setMapExpanded] = useState(false);
+  const [mapLoaded, setMapLoaded] = useState(false);
+  const [mapStalled, setMapStalled] = useState(false);
+  const [mapKey, setMapKey] = useState(0);
+  const mapHeight = Math.round(
+    Math.min(
+      Math.max(windowHeight * (mapExpanded ? 0.78 : 0.5), 340),
+      mapExpanded ? 720 : 520,
+    ),
+  );
+  useEffect(() => {
+    if (step !== "result" || mapLoaded) return;
+    setMapStalled(false);
+    const timer = setTimeout(() => setMapStalled(true), 7000);
+    return () => clearTimeout(timer);
+  }, [step, mapLoaded, mapKey]);
   // Način putovanja do odabranog mjesta; null = nije odabran, pa se predlaže
   // prema udaljenosti. Početna vrijednost dolazi iz izbora "Prijevoz" u formi.
   const [navMode, setNavMode] = useState<TravelMode | null>(null);
@@ -1041,6 +1062,9 @@ export function PlanMyDayModal({
     setActiveStop(0);
     setCompletedStops(new Set());
     setMapReady(false);
+    setMapLoaded(false);
+    setMapStalled(false);
+    setMapExpanded(false);
     setPreviewVenue(null);
     setNavMode(null);
     setExpandedCategories(new Set());
@@ -3058,8 +3082,12 @@ export function PlanMyDayModal({
                   }}
                 >
                   <MapView
+                    key={`planmap_${mapKey}`}
                     ref={mapRef}
-                    style={{ height: 320 }}
+                    style={{ height: mapHeight, width: "100%" }}
+                    loadingEnabled
+                    loadingIndicatorColor={DC.accent}
+                    onMapLoaded={() => setMapLoaded(true)}
                     initialRegion={{
                       latitude:
                         activeDayActivities[0]?.venue?.latitude ??
@@ -3071,6 +3099,7 @@ export function PlanMyDayModal({
                       longitudeDelta: 0.02,
                     }}
                     onMapReady={() => setMapReady(true)}
+                    zoomControlEnabled
                     customMapStyle={PLAN_MAP_STYLE}
                     toolbarEnabled={false}
                     moveOnMarkerPress={false}
@@ -3179,6 +3208,18 @@ export function PlanMyDayModal({
                         <Text style={mapPillText(isDark)}>◎</Text>
                       </TouchableOpacity>
                     )}
+                    <TouchableOpacity
+                      onPress={() => setMapExpanded((v) => !v)}
+                      style={mapPill(isDark)}
+                      accessibilityRole="button"
+                      accessibilityLabel={t(
+                        mapExpanded ? "plan.mapShrink" : "plan.mapEnlarge",
+                      )}
+                    >
+                      <Text style={mapPillText(isDark)}>
+                        {mapExpanded ? "▭" : "▢"}
+                      </Text>
+                    </TouchableOpacity>
                     {activeDayActivities.length > 1 && (
                       <TouchableOpacity
                         onPress={fitWholeDay}
@@ -3190,6 +3231,37 @@ export function PlanMyDayModal({
                       </TouchableOpacity>
                     )}
                   </View>
+
+                  {/* Karta se nije iscrtala: ponovno učitavanje jednim dodirom. */}
+                  {mapStalled && !mapLoaded && (
+                    <View
+                      pointerEvents="box-none"
+                      style={{
+                        position: "absolute",
+                        left: 0,
+                        right: 0,
+                        bottom: 12,
+                        alignItems: "center",
+                      }}
+                    >
+                      <TouchableOpacity
+                        onPress={() => {
+                          setMapReady(false);
+                          setMapStalled(false);
+                          setMapKey((k) => k + 1);
+                        }}
+                        style={[
+                          mapPill(isDark),
+                          { width: "auto", paddingHorizontal: 16 },
+                        ]}
+                        accessibilityRole="button"
+                      >
+                        <Text style={mapPillText(isDark)}>
+                          ↻ {t("plan.mapReload")}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
                 </View>
 
                 {renderStopCard()}
@@ -3197,6 +3269,22 @@ export function PlanMyDayModal({
                 {renderTimeline()}
               </>
             )}
+
+            {geocodedCoords &&
+              activeDayActivities.length === 0 &&
+              Object.keys(allVenues).length > 0 && (
+                <Text
+                  style={{
+                    marginHorizontal: 16,
+                    marginTop: 12,
+                    marginBottom: 12,
+                    fontSize: T.meta,
+                    color: DC.textDim,
+                  }}
+                >
+                  {t("plan.noStopsFit")}
+                </Text>
+              )}
 
             {/* MJESTA PO KATEGORIJAMA */}
             {Object.keys(allVenues).length > 0 && (

@@ -334,8 +334,30 @@ const RADIUS_CHOICES = [5, 10, 25, 50, 100] as const;
 // pamti — ovo vrijedi samo dok ništa nije spremljeno.
 const DEFAULT_TYPES = ["cafe", "restaurant", "park"];
 
-// Početni limit rezultata na karti
-const INITIAL_RESULTS_LIMIT = 20;
+// Početni limit rezultata na karti. Više od desetak markera odjednom karti
+// oduzima preglednost; korisnik ih postupno dodaje ("+10 više").
+const INITIAL_RESULTS_LIMIT = 10;
+/** Za koliko se limit povećava jednim dodirom na "više". */
+const RESULTS_STEP = 10;
+
+/**
+ * Poredak za prikaz kad je odabrano više kategorija: naizmjence po jedno
+ * mjesto iz svake (najbliža prva). Inače bi prvih 10 najbližih mjesta mogla
+ * biti sve kafići, a ostale odabrane kategorije bi se na karti pojavile tek
+ * nakon "više".
+ */
+function interleaveByType<T extends { type: string }>(
+  list: T[],
+  typeOrder: string[],
+): T[] {
+  const buckets = typeOrder.map((ty) => list.filter((p) => p.type === ty));
+  const rest = list.filter((p) => !typeOrder.includes(p.type));
+  const out: T[] = [];
+  for (let i = 0; buckets.some((b) => i < b.length); i++) {
+    for (const b of buckets) if (i < b.length) out.push(b[i]);
+  }
+  return [...out, ...rest];
+}
 /** Nakon ovoliko sekundi učitavanje se prekida i nudi "Ponovi", što god se dogodilo ispod. */
 const LOAD_WATCHDOG_MS = 25000;
 
@@ -10569,7 +10591,7 @@ export default function DashboardScreen() {
     }
     setActiveTimeOfDay(tod);
     setSelectedTypes(TIME_CATS[tod] || []);
-    setDisplayLimit(50); // ← povećaj limit kod TOD filtera
+    setDisplayLimit(INITIAL_RESULTS_LIMIT);
   };
 
   const handleMarkVisited = async (place: Place) => {
@@ -10706,10 +10728,7 @@ export default function DashboardScreen() {
       : ageFilteredPlaces;
 
     if (selectedTypes.length > 0 && !focusedType) {
-      base = [
-        ...base.filter((p) => selectedTypes.includes(p.type)),
-        ...base.filter((p) => !selectedTypes.includes(p.type)),
-      ];
+      base = interleaveByType(base, selectedTypes);
     }
 
     return base.slice(0, displayLimit);
@@ -12215,10 +12234,16 @@ export default function DashboardScreen() {
                   {hasMore && (
                     <TouchableOpacity
                       style={UI_STYLES.infoShowMoreBtn}
-                      onPress={() => setDisplayLimit((prev) => prev + 20)}
+                      onPress={() =>
+                        setDisplayLimit((prev) => prev + RESULTS_STEP)
+                      }
                     >
                       <Text style={UI_STYLES.infoShowMoreText}>
-                        +{Math.min(totalFiltered - placesForMap.length, 20)}{" "}
+                        +
+                        {Math.min(
+                          totalFiltered - placesForMap.length,
+                          RESULTS_STEP,
+                        )}{" "}
                         {t("common.more")}
                       </Text>
                     </TouchableOpacity>

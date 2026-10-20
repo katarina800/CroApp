@@ -1006,7 +1006,11 @@
     "dayBudget": "Tagesbudget: {{budget}} €",
     "showMoreInterests": "Alle anzeigen",
     "showFewerInterests": "Weniger",
-    "interestsSelected": "Ausgewählt: {{count}}"
+    "interestsSelected": "Ausgewählt: {{count}}",
+    "mapEnlarge": "Karte vergrößern",
+    "mapShrink": "Karte verkleinern",
+    "mapReload": "Karte neu laden",
+    "noStopsFit": "Mit diesen Einstellungen passt kein Ort in den Zeitplan. Versuche einen größeren Radius, ein höheres Budget oder ein anderes Verkehrsmittel — die gefundenen Orte stehen unten."
   },
   "story": {
     "myStory": "Meine Story",

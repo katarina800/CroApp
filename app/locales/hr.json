@@ -1056,7 +1056,11 @@
     "dayBudget": "budžet za dan: {{budget}} €",
     "showMoreInterests": "Prikaži sve",
     "showFewerInterests": "Manje",
-    "interestsSelected": "Odabrano: {{count}}"
+    "interestsSelected": "Odabrano: {{count}}",
+    "mapEnlarge": "Povećaj kartu",
+    "mapShrink": "Smanji kartu",
+    "mapReload": "Ponovno učitaj kartu",
+    "noStopsFit": "Za odabrane postavke nijedno mjesto ne stane u raspored. Probaj veći radijus, veći budžet ili drugi prijevoz — pronađena mjesta su ispod."
   },
   "story": {
     "myStory": "Moj story",

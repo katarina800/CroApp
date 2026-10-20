@@ -1032,7 +1032,11 @@
     "dayBudget": "daily budget: €{{budget}}",
     "showMoreInterests": "Show all",
     "showFewerInterests": "Less",
-    "interestsSelected": "Selected: {{count}}"
+    "interestsSelected": "Selected: {{count}}",
+    "mapEnlarge": "Enlarge map",
+    "mapShrink": "Shrink map",
+    "mapReload": "Reload map",
+    "noStopsFit": "With these settings no place fits the schedule. Try a larger radius, a bigger budget or another transport — the places found are listed below."
   },
   "schedBreakfast": "Breakfast",
   "schedMorningTour": "Morning sightseeing — least tourist traffic",
