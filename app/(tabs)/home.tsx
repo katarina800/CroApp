@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { clearToken } from "@/utils/tokenStore";
+import { unregisterPush } from "../../utils/pushNotifications";
 
 export default function HomeScreen() {
   const { t } = useTranslation();
@@ -32,6 +33,7 @@ export default function HomeScreen() {
         text: t("auth.logout"),
         style: "destructive",
         onPress: async () => {
+          await unregisterPush();
           await clearToken();
           await AsyncStorage.removeItem("firstName");
           await AsyncStorage.removeItem("lastName");

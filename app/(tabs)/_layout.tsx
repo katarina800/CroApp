@@ -10,9 +10,11 @@ import i18n, { languageReady } from "../config/i18n";
 import { clearSession, isTokenExpired } from "../../utils/session";
 import { TutorialModal, hasSeenTutorial } from "../../components/TutorialModal";
 import { getToken } from "@/utils/tokenStore";
+import { usePushNotifications } from "../../hooks/usePushNotifications";
 
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
+  usePushNotifications();
   // Vodič se pokazuje jednom, pri prvom ulasku u aplikaciju nakon prijave.
   // Ovdje, a ne na ekranu prijave, jer ispod njega treba stajati aplikacija
   // o kojoj govori.

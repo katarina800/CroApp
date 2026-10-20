@@ -11,6 +11,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { API_BASE_URL } from "../app/config/api";
 import { getToken } from "@/utils/tokenStore";
+import { registerForPush } from "./pushNotifications";
 
 export interface AppNotification {
   id: number;
@@ -196,7 +197,12 @@ export async function saveNotificationPreferences(
       }),
     });
 
-    if (res.ok) return { ok: true };
+    if (res.ok) {
+      // Uključene obavijesti = trenutak da se zatraži dozvola i prijavi uređaj;
+      // isključene = uređaj se skida. Ne čeka se: spremanje je već uspjelo.
+      void registerForPush(prefs.appEnabled);
+      return { ok: true };
+    }
     if (res.status === 401 || res.status === 403)
       return { ok: false, reason: "auth", status: res.status };
     return { ok: false, reason: "server", status: res.status };

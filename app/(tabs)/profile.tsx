@@ -37,6 +37,7 @@ import { ErrorBanner } from "../../components/StateView";
 import { saveLanguage } from "../config/i18n";
 import { T } from "../../styles/varaTheme";
 import { getToken, clearToken } from "@/utils/tokenStore";
+import { unregisterPush } from "../../utils/pushNotifications";
 
 const { width: SCREEN_W } = Dimensions.get("window");
 
@@ -2467,6 +2468,7 @@ function ScreenTimeCountdown() {
         {
           text: "OK",
           onPress: async () => {
+            await unregisterPush();
             await clearToken();
             router.replace("/login");
           },
@@ -3739,6 +3741,8 @@ function SettingsModal({
         text: "Odjavi se",
         style: "destructive",
         onPress: async () => {
+          // Prije brisanja prijave: treba je da bi poslužitelj skinuo uređaj.
+          await unregisterPush();
           resetProfile();
           await AsyncStorage.clear();
           router.replace("/login");
@@ -4630,6 +4634,7 @@ export default function ProfileScreen() {
             {
               text: "OK",
               onPress: async () => {
+                await unregisterPush();
                 await clearToken();
                 router.replace("/login");
               },
