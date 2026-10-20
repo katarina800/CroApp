@@ -892,7 +892,14 @@ export function PlanMyDayModal({
   useEffect(() => {
     if (step !== "result" || mapLoaded) return;
     setMapStalled(false);
-    const timer = setTimeout(() => setMapStalled(true), 7000);
+    if (__DEV__)
+      console.log(
+        `[plan-map] showing map ${mapHeight}px, ${activeDayActivities.length} stops`,
+      );
+    const timer = setTimeout(() => {
+      if (__DEV__) console.log("[plan-map] tiles NOT loaded after 7s");
+      setMapStalled(true);
+    }, 7000);
     return () => clearTimeout(timer);
   }, [step, mapLoaded, mapKey]);
   // Način putovanja do odabranog mjesta; null = nije odabran, pa se predlaže
@@ -3087,7 +3094,10 @@ export function PlanMyDayModal({
                     style={{ height: mapHeight, width: "100%" }}
                     loadingEnabled
                     loadingIndicatorColor={DC.accent}
-                    onMapLoaded={() => setMapLoaded(true)}
+                    onMapLoaded={() => {
+                      if (__DEV__) console.log("[plan-map] tiles loaded");
+                      setMapLoaded(true);
+                    }}
                     initialRegion={{
                       latitude:
                         activeDayActivities[0]?.venue?.latitude ??
@@ -3098,7 +3108,10 @@ export function PlanMyDayModal({
                       latitudeDelta: 0.02,
                       longitudeDelta: 0.02,
                     }}
-                    onMapReady={() => setMapReady(true)}
+                    onMapReady={() => {
+                      if (__DEV__) console.log("[plan-map] ready");
+                      setMapReady(true);
+                    }}
                     zoomControlEnabled
                     customMapStyle={PLAN_MAP_STYLE}
                     toolbarEnabled={false}

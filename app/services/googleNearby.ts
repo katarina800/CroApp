@@ -33,7 +33,9 @@ export const GOOGLE_TYPE_MAP: Partial<Record<Place["type"], string[]>> = {
   spa: ["spa"],
   park: ["park"],
   accommodation: ["lodging"],
-  landmark: ["tourist_attraction", "place_of_worship"],
+  // "place_of_worship" nije dopušten u upitu (samo u odgovoru): Google je cijeli
+  // upit odbijao s HTTP 400, pa se nijedna znamenitost nikad nije učitala.
+  landmark: ["tourist_attraction", "historical_landmark", "church"],
   opg: ["farm"],
 };
 
