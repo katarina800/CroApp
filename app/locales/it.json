@@ -904,7 +904,7 @@
     "companionFamily": "Famiglia",
     "companionFamilyDesc": "Con bambini",
     "transportLabel": "Trasporto",
-    "budgetLabel": "Budget (EUR)",
+    "budgetLabel": "Budget a persona, totale del viaggio (EUR)",
     "budgetPlaceholder": "es. 500",
     "radiusLabel": "Raggio di ricerca",
     "interestsLabel": "Interessi (opzionale)",
@@ -1051,7 +1051,12 @@
     "anonymous": "Utente anonimo",
     "travelFromPrevious": "{{min}} min dalla tappa precedente",
     "firstStop": "Prima tappa",
-    "noVenues": "Al momento non siamo riusciti a caricare i luoghi per questa città. Il servizio è temporaneamente sovraccarico o il raggio è troppo piccolo. Attendi un minuto e riprova, oppure aumenta il raggio."
+    "noVenues": "Al momento non siamo riusciti a caricare i luoghi per questa città. Il servizio è temporaneamente sovraccarico o il raggio è troppo piccolo. Attendi un minuto e riprova, oppure aumenta il raggio.",
+    "dayCost": "Costo stimato: ~{{min}}–{{max}} € a persona",
+    "dayBudget": "budget giornaliero: {{budget}} €",
+    "showMoreInterests": "Mostra tutti",
+    "showFewerInterests": "Meno",
+    "interestsSelected": "Selezionati: {{count}}"
   },
   "story": {
     "myStory": "La mia storia",

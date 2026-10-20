@@ -854,7 +854,7 @@
     "companionFamily": "Familie",
     "companionFamilyDesc": "Mit Kindern",
     "transportLabel": "Transport",
-    "budgetLabel": "Budget (EUR)",
+    "budgetLabel": "Budget pro Person, gesamt für die Reise (EUR)",
     "budgetPlaceholder": "z.B. 500",
     "radiusLabel": "Suchradius",
     "interestsLabel": "Interessen (optional)",
@@ -1001,7 +1001,12 @@
     "anonymous": "Anonymer Nutzer",
     "travelFromPrevious": "{{min}} Min. von der vorigen Station",
     "firstStop": "Erste Station",
-    "noVenues": "Für diese Stadt konnten wir gerade keine Orte laden. Der Dienst ist vorübergehend überlastet oder der Radius ist zu klein. Warten Sie eine Minute und versuchen Sie es erneut, oder vergrößern Sie den Radius."
+    "noVenues": "Für diese Stadt konnten wir gerade keine Orte laden. Der Dienst ist vorübergehend überlastet oder der Radius ist zu klein. Warten Sie eine Minute und versuchen Sie es erneut, oder vergrößern Sie den Radius.",
+    "dayCost": "Geschätzte Kosten: ~{{min}}–{{max}} € pro Person",
+    "dayBudget": "Tagesbudget: {{budget}} €",
+    "showMoreInterests": "Alle anzeigen",
+    "showFewerInterests": "Weniger",
+    "interestsSelected": "Ausgewählt: {{count}}"
   },
   "story": {
     "myStory": "Meine Story",

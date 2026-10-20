@@ -114,6 +114,98 @@ const DAY_END_MINUTES = 23 * 60;
 // Više od ovoga nitko ne stigne odraditi u jednom danu.
 const MAX_STOPS_PER_DAY = 14;
 
+/**
+ * Koliko postaja (zajedno s obrocima) je razuman dan. Prije je plan punio dan
+ * do 14 stanica, što je u praksi raspored za ljude koji ne gledaju ništa,
+ * samo prolaze. Opušteni dan ima manje, a obitelj s djecom još manje.
+ */
+const STOPS_BY_STYLE: Record<PlanStyle, number> = {
+  opusteno: 6,
+  kulturno: 8,
+  avantura: 7,
+};
+
+interface CompanionRule {
+  /** Dodatak/oduzimanje broja postaja u danu. */
+  stopsDelta: number;
+  /** Najkasniji kraj dana (minute od ponoći). */
+  dayEnd: number;
+  /** Kategorije koje se uopće ne nude. */
+  exclude: string[];
+  /** Množitelji težine pojedinih kategorija. */
+  boost: Record<string, number>;
+  /** Množitelj za trajanje obroka (djeca ne sjede 75 minuta). */
+  mealFactor: number;
+}
+
+const COMPANION_RULES: Record<CompanionType, CompanionRule> = {
+  solo: {
+    stopsDelta: 0,
+    dayEnd: DAY_END_MINUTES,
+    exclude: [],
+    boost: { museum: 1.3, landmark: 1.2, cafe: 1.2, market: 1.2 },
+    mealFactor: 1,
+  },
+  partner: {
+    stopsDelta: -1,
+    dayEnd: DAY_END_MINUTES,
+    exclude: ["paintball"],
+    boost: { spa: 1.5, theater: 1.4, beach: 1.3, park: 1.2, cafe: 1.2 },
+    mealFactor: 1.15,
+  },
+  prijatelji: {
+    stopsDelta: 0,
+    dayEnd: DAY_END_MINUTES,
+    exclude: [],
+    boost: { paintball: 1.5, escapeRoom: 1.5, club: 1.5, cinema: 1.2 },
+    mealFactor: 1,
+  },
+  obitelj: {
+    stopsDelta: -1,
+    // Djeca ne izdrže noćni program; dan završava ranije.
+    dayEnd: 21 * 60,
+    exclude: ["club", "spa", "paintball"],
+    boost: { park: 1.5, beach: 1.4, cinema: 1.2, nationalPark: 1.2 },
+    mealFactor: 0.85,
+  },
+};
+
+/** Najviše postaja za dan; vidi {@link STOPS_BY_STYLE}. */
+export function maxStopsFor(
+  style: PlanStyle,
+  companions: CompanionType | null | undefined,
+): number {
+  const delta = companions ? COMPANION_RULES[companions].stopsDelta : 0;
+  return Math.max(
+    4,
+    Math.min(MAX_STOPS_PER_DAY, STOPS_BY_STYLE[style] + delta),
+  );
+}
+
+/** "10-25" → 17.5; "0" → 0. */
+export function costMid(cost: string): number {
+  const [lo, hi] = cost.split("-").map((x) => parseFloat(x));
+  if (!Number.isFinite(lo)) return 0;
+  return Number.isFinite(hi) ? (lo + hi) / 2 : lo;
+}
+
+/** Zbroj procjena troškova dana (po osobi): raspon i sredina. */
+export function estimateDayCost(activities: DayActivity[]): {
+  min: number;
+  max: number;
+  mid: number;
+} {
+  let min = 0;
+  let max = 0;
+  for (const a of activities) {
+    const [lo, hi] = a.cost.split("-").map((x) => parseFloat(x));
+    const l = Number.isFinite(lo) ? lo : 0;
+    min += l;
+    max += Number.isFinite(hi) ? hi : l;
+  }
+  return { min, max, mid: (min + max) / 2 };
+}
+
 export interface ActivityTemplate {
   type: string;
   duration: number;
@@ -324,6 +416,7 @@ export const ACTIVITY_CATALOG: ActivityTemplate[] = [
 function travelMinutesBetween(
   from: { latitude: number; longitude: number } | null,
   to: { latitude: number; longitude: number } | null,
+  mode?: TravelMode | null,
 ): number {
   if (!from || !to) return 10;
   const km = haversineKm(
@@ -332,6 +425,9 @@ function travelMinutesBetween(
     to.latitude,
     to.longitude,
   );
+  // Odabrani prijevoz: pješak i biciklist ne smiju dobiti raspored u kojem je
+  // sljedeća postaja 5 km dalje, a vozač ne treba 5 minuta po kilometru.
+  if (mode) return Math.min(90, Math.max(3, estimateMinutes(km, mode)));
   // ~5 min/km (pješice/kratka vožnja) + 5 min na parkiranje/orijentaciju.
   return Math.min(60, Math.max(5, Math.round(5 + km * 5)));
 }
@@ -373,16 +469,33 @@ export function getTimeBasedActivities(
     nowMinutes?: number;
     style?: PlanStyle;
     dayCount?: number;
+    /** S kim se putuje; null = nije odabrano. */
+    companions?: CompanionType | null;
+    /** Ukupni budžet po osobi za cijelo putovanje (EUR); null/0 = bez ograničenja. */
+    budget?: number | null;
+    /** Odabrani prijevoz; null = nije odabrano. */
+    mode?: TravelMode | null;
   },
 ): DayActivity[] {
   const tr = (key: string, fallback: string) => (t ? t(key) : fallback);
   const style: PlanStyle = options?.style ?? "kulturno";
   const dayCount = Math.max(1, options?.dayCount ?? 1);
+  const companions = options?.companions ?? null;
+  const rule = companions ? COMPANION_RULES[companions] : null;
+  const dayEnd = rule ? rule.dayEnd : DAY_END_MINUTES;
+  const maxStops = maxStopsFor(style, companions);
+  const mode = options?.mode ?? null;
+  // Pješaku i biciklistu je "daleko" ono što bi vozaču bilo "blizu".
+  const maxLegMinutes =
+    mode === "walking" ? 25 : mode === "bicycling" ? 30 : 60;
+  const dayBudget =
+    options?.budget && options.budget > 0 ? options.budget / dayCount : null;
+  let spent = 0;
 
   const startMinutes = options?.spontaneous
     ? // Spontani plan počinje "sad", zaokruženo na sljedećih 15 minuta.
       Math.min(
-        DAY_END_MINUTES,
+        dayEnd,
         Math.max(
           DAY_START_MINUTES,
           Math.ceil((options.nowMinutes ?? DAY_START_MINUTES) / 15) * 15,
@@ -408,12 +521,15 @@ export function getTimeBasedActivities(
   const pickVenue = (
     type: string,
     from: { latitude: number; longitude: number } | null,
+    maxLeg: number = maxLegMinutes,
   ): { venue: VenueItem; travel: number } | null => {
     const list = allVenues[type] || [];
     let best: { venue: VenueItem; travel: number; score: number } | null = null;
     for (const v of list) {
       if (usedVenueNames.has(v.name)) continue;
-      const travel = travelMinutesBetween(from, v);
+      const travel = travelMinutesBetween(from, v, mode);
+      // Preduga etapa za odabrani prijevoz (pješice 40 min do muzeja nije plan).
+      if (travel > maxLeg) continue;
       const score = -travel + (preferredForToday(type, v) ? 30 : 0);
       if (!best || score > best.score) best = { venue: v, travel, score };
     }
@@ -460,7 +576,22 @@ export function getTimeBasedActivities(
       descriptionKey: "plan.schedDinner",
       fallback: "Večera",
     },
-  ].filter((a) => a.latest >= startMinutes);
+  ]
+    .filter((a) => a.latest >= startMinutes)
+    .map((a) => {
+      const mf = rule?.mealFactor ?? 1;
+      // Mali dnevni budžet: obroci su jeftiniji (pekara, gablec) pa ostane
+      // nešto i za razgledavanje.
+      const tight = dayBudget !== null && dayBudget < 70;
+      const cost = tight
+        ? a.type === "cafe"
+          ? "3-5"
+          : a.preferred < 15 * 60
+            ? "6-10"
+            : "8-14"
+        : a.cost;
+      return { ...a, cost, duration: Math.round((a.duration * mf) / 5) * 5 };
+    });
 
   // --- Gradnja vremenske crte --------------------------------------------
   interface PlacedStop {
@@ -498,6 +629,7 @@ export function getTimeBasedActivities(
   ) => {
     usedVenueNames.add(venue.name);
     usedCount[tpl.type] = (usedCount[tpl.type] || 0) + 1;
+    spent += costMid(tpl.cost);
     placed.push({
       startAt,
       duration: tpl.duration,
@@ -511,7 +643,7 @@ export function getTimeBasedActivities(
     position = venue;
   };
 
-  while (cursor < DAY_END_MINUTES && placed.length < MAX_STOPS_PER_DAY) {
+  while (cursor < dayEnd && placed.length < maxStops) {
     // 1) Je li na redu obrok?
     const anchor: Anchor | undefined = anchors[anchorIdx];
     if (anchor && cursor > anchor.latest) {
@@ -519,14 +651,14 @@ export function getTimeBasedActivities(
       continue;
     }
     if (anchor && cursor + 20 >= anchor.preferred) {
-      const found = pickVenue(anchor.type, position);
+      // Obrok se ne ispušta zbog udaljenosti: radije dulja etapa nego bez ručka.
+      const found =
+        pickVenue(anchor.type, position) ??
+        pickVenue(anchor.type, position, 90);
       anchorIdx++;
       if (found) {
         const startAt = Math.max(cursor + found.travel, anchor.preferred);
-        if (
-          startAt <= anchor.latest &&
-          startAt + anchor.duration <= DAY_END_MINUTES
-        ) {
+        if (startAt <= anchor.latest && startAt + anchor.duration <= dayEnd) {
           place(startAt, anchor, found.venue, found.travel);
           continue;
         }
@@ -539,12 +671,12 @@ export function getTimeBasedActivities(
     //    restorana stigne doći — inače bi dugačka aktivnost (npr. kazalište
     //    19:00–21:00) pojela večeru, koja bi onda ispala iz plana.
     const blockEnd = anchor
-      ? Math.min(anchor.latest - MEAL_TRAVEL_SLACK, DAY_END_MINUTES)
-      : DAY_END_MINUTES;
+      ? Math.min(anchor.latest - MEAL_TRAVEL_SLACK, dayEnd)
+      : dayEnd;
     // Broj mjesta koja treba ostaviti za preostale obroke — bez ovoga bi
     // gornja granica broja stajališta znala pojesti večeru.
     const reserved = anchors.length - anchorIdx;
-    if (placed.length + reserved >= MAX_STOPS_PER_DAY) {
+    if (placed.length + reserved >= maxStops) {
       if (anchor) {
         cursor = Math.max(cursor, anchor.preferred);
         continue;
@@ -561,9 +693,23 @@ export function getTimeBasedActivities(
       travel: number;
     } | null = null;
 
+    // Obroci koji tek dolaze moraju stati u budžet kad se potroši ostatak.
+    const mealsAhead = anchors
+      .slice(anchorIdx)
+      .reduce((sum, a) => sum + costMid(a.cost), 0);
+
     for (const tpl of ACTIVITY_CATALOG) {
-      const weight = tpl.weights[style];
+      if (rule?.exclude.includes(tpl.type)) continue;
+      const weight = tpl.weights[style] * (rule?.boost[tpl.type] ?? 1);
       if (weight <= 0) continue;
+      const cost = costMid(tpl.cost);
+      // Besplatno uvijek može; plaćeno samo ako stane u preostali budžet.
+      if (
+        dayBudget !== null &&
+        cost > 0 &&
+        spent + cost + mealsAhead > dayBudget
+      )
+        continue;
       if ((usedCount[tpl.type] || 0) >= tpl.maxPerDay) continue;
       const found = pickVenue(tpl.type, position);
       if (!found) continue;
@@ -586,7 +732,9 @@ export function getTimeBasedActivities(
         wait * 0.8 -
         (usedCount[tpl.type] || 0) * 15 -
         // Skraćena aktivnost je slabija od pune.
-        (tpl.duration - duration) * 0.2;
+        (tpl.duration - duration) * 0.2 -
+        // S budžetom skuplje aktivnosti gube na težini (besplatne ne).
+        (dayBudget !== null ? (cost / dayBudget) * 40 : 0);
       if (!bestCandidate || score > bestCandidate.score) {
         bestCandidate = {
           tpl,
@@ -614,7 +762,7 @@ export function getTimeBasedActivities(
       cursor = Math.max(cursor, anchor.preferred);
       // Ako je i nakon pomaka blok prazan, sidro će se obraditi u sljedećem
       // krugu; ako ni tada ne uspije, anchorIdx se pomiče i petlja ide dalje.
-      if (cursor >= DAY_END_MINUTES) break;
+      if (cursor >= dayEnd) break;
       continue;
     }
     break;

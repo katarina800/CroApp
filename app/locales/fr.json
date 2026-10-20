@@ -904,7 +904,7 @@
     "companionFamily": "Famille",
     "companionFamilyDesc": "Avec des enfants",
     "transportLabel": "Transport",
-    "budgetLabel": "Budget (EUR)",
+    "budgetLabel": "Budget par personne, total du voyage (EUR)",
     "budgetPlaceholder": "ex. 500",
     "radiusLabel": "Rayon de recherche",
     "interestsLabel": "Centres d'intérêt (optionnel)",
@@ -1051,7 +1051,12 @@
     "anonymous": "Utilisateur anonyme",
     "travelFromPrevious": "{{min}} min depuis l'arrêt précédent",
     "firstStop": "Premier arrêt",
-    "noVenues": "Impossible de charger les lieux de cette ville pour le moment. Le service est temporairement surchargé ou le rayon est trop petit. Patientez une minute puis réessayez, ou augmentez le rayon."
+    "noVenues": "Impossible de charger les lieux de cette ville pour le moment. Le service est temporairement surchargé ou le rayon est trop petit. Patientez une minute puis réessayez, ou augmentez le rayon.",
+    "dayCost": "Coût estimé : ~{{min}}–{{max}} € par personne",
+    "dayBudget": "budget du jour : {{budget}} €",
+    "showMoreInterests": "Tout afficher",
+    "showFewerInterests": "Moins",
+    "interestsSelected": "Sélectionnés : {{count}}"
   },
   "story": {
     "myStory": "Mon story",

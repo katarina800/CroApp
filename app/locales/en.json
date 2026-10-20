@@ -893,7 +893,7 @@
     "companionFamily": "Family",
     "companionFamilyDesc": "With children",
     "transportLabel": "Transport",
-    "budgetLabel": "Budget (EUR)",
+    "budgetLabel": "Budget per person, total for the trip (EUR)",
     "budgetPlaceholder": "e.g. 500",
     "radiusLabel": "Search radius",
     "interestsLabel": "Interests (optional)",
@@ -1027,7 +1027,12 @@
     "anonymous": "Anonymous user",
     "travelFromPrevious": "{{min}} min from the previous stop",
     "firstStop": "First stop",
-    "noVenues": "We couldn't load places for that city right now. The service that provides them is temporarily busy, or the radius is too small. Wait a minute and try again, or increase the radius."
+    "noVenues": "We couldn't load places for that city right now. The service that provides them is temporarily busy, or the radius is too small. Wait a minute and try again, or increase the radius.",
+    "dayCost": "Estimated cost: ~€{{min}}–{{max}} per person",
+    "dayBudget": "daily budget: €{{budget}}",
+    "showMoreInterests": "Show all",
+    "showFewerInterests": "Less",
+    "interestsSelected": "Selected: {{count}}"
   },
   "schedBreakfast": "Breakfast",
   "schedMorningTour": "Morning sightseeing — least tourist traffic",

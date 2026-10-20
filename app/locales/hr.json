@@ -904,7 +904,7 @@
     "companionFamily": "Obitelj",
     "companionFamilyDesc": "S djecom",
     "transportLabel": "Prijevoz",
-    "budgetLabel": "Budžet (EUR)",
+    "budgetLabel": "Budžet po osobi, ukupno za putovanje (EUR)",
     "budgetPlaceholder": "npr. 500",
     "radiusLabel": "Radijus pretrage",
     "interestsLabel": "Interesi (opcionalno)",
@@ -1051,7 +1051,12 @@
     "anonymous": "Anonimni korisnik",
     "travelFromPrevious": "{{min}} min od prethodne postaje",
     "firstStop": "Prva postaja",
-    "noVenues": "Za taj grad trenutno nismo uspjeli dohvatiti mjesta. Servis koji ih daje je privremeno preopterećen ili je radijus premalen. Pričekajte minutu pa pokušajte ponovno, ili povećajte radijus."
+    "noVenues": "Za taj grad trenutno nismo uspjeli dohvatiti mjesta. Servis koji ih daje je privremeno preopterećen ili je radijus premalen. Pričekajte minutu pa pokušajte ponovno, ili povećajte radijus.",
+    "dayCost": "Procjena troška: ~{{min}}–{{max}} € po osobi",
+    "dayBudget": "budžet za dan: {{budget}} €",
+    "showMoreInterests": "Prikaži sve",
+    "showFewerInterests": "Manje",
+    "interestsSelected": "Odabrano: {{count}}"
   },
   "story": {
     "myStory": "Moj story",

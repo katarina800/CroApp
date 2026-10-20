@@ -16,7 +16,6 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
-  useWindowDimensions,
   Image,
   KeyboardAvoidingView,
   Linking,
@@ -47,6 +46,7 @@ import { useTheme } from "./AdaptiveThemeProvider";
 import { fetchGoogleNearby } from "@/app/services/googleNearby";
 import { getToken } from "@/utils/tokenStore";
 import {
+  estimateDayCost,
   estimateMinutes,
   getTimeBasedActivities,
   haversineKm,
@@ -65,11 +65,6 @@ import {
 // Tipovi
 // ---------------------------------------------------------------------------
 type PlanStep = "form" | "loading" | "result";
-interface VenueWithType {
-  venue: VenueItem;
-  type: string;
-}
-
 interface VisitRecord {
   id: string;
   placeId: string;
@@ -185,44 +180,6 @@ const MARKER_IMAGES: Record<string, any> = {
   spa: APP_ICONS.spa,
   other: APP_ICONS.other,
 };
-
-// ---------------------------------------------------------------------------
-// Helper funkcije
-// ---------------------------------------------------------------------------
-function normalize(s: string): string {
-  return s
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^\w\s]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function venueNamesMatch(a: string, b: string): boolean {
-  const n1 = normalize(a);
-  const n2 = normalize(b);
-  if (!n1 || !n2) return false;
-  return n1 === n2 || n1.includes(n2) || n2.includes(n1);
-}
-
-function findVenueByName(
-  name: string,
-  allVenues: Record<string, VenueItem[]>,
-  typeHint?: string | null,
-): { venue: VenueItem; type: string } | null {
-  if (!name) return null;
-  const normalized = normalize(name);
-
-  for (const [type, list] of Object.entries(allVenues)) {
-    for (const v of list) {
-      if (venueNamesMatch(v.name, name)) {
-        return { venue: v, type };
-      }
-    }
-  }
-  return null;
-}
 
 // ---------------------------------------------------------------------------
 // fetchVenuesNearCity
@@ -435,6 +392,20 @@ function ProgressBar({ step, total }: { step: number; total: number }) {
   );
 }
 
+// Najčešći interesi vidljivi su odmah; ostali iza "Prikaži sve". Prije je ovdje
+// bila rešetka od 18 velikih pločica (130 px) — forma je bila gotovo dva ekrana
+// dugačka samo zbog interesa.
+const PRIMARY_INTERESTS = [
+  "restaurant",
+  "cafe",
+  "landmark",
+  "museum",
+  "park",
+  "beach",
+  "market",
+  "nationalPark",
+];
+
 const InterestiGrid = React.memo(function InterestiGrid({
   interests,
   onToggle,
@@ -446,69 +417,71 @@ const InterestiGrid = React.memo(function InterestiGrid({
   DC: ReturnType<typeof getDC>;
   t: (key: string, opts?: any) => string;
 }) {
-  const keys = Object.keys(EMOJIS);
-  // useWindowDimensions umjesto Dimensions.get() na razini modula: ono se
-  // očita jednom pri učitavanju i nikad se ne osvježi, pa je u podijeljenom
-  // zaslonu ili na preklopnom uređaju širina kartica ostajala kriva.
-  const { width: windowWidth } = useWindowDimensions();
-  const cardW = (windowWidth - 32 - 4) / 2 - 2;
+  const [expanded, setExpanded] = useState(false);
+  const all = Object.keys(EMOJIS);
+  // Odabrani interes mora ostati vidljiv i kad je popis sažet.
+  const visible = expanded
+    ? all
+    : all.filter(
+        (id) => PRIMARY_INTERESTS.includes(id) || interests.includes(id),
+      );
 
   return (
-    <View style={{ gap: 4 }}>
-      {Array.from({ length: Math.ceil(keys.length / 2) }, (_, i) => {
-        const pair = keys.slice(i * 2, i * 2 + 2);
-        return (
-          <View
-            key={`row_${i}`}
-            style={{ flexDirection: "row", gap: 4, marginHorizontal: -14 }}
-          >
-            {pair.map((id) => {
-              const active = interests.includes(id);
-              return (
-                <TouchableOpacity
-                  key={id}
-                  style={{
-                    width: cardW,
-                    height: 130,
-                    borderRadius: 12,
-                    backgroundColor: active ? DC.border : DC.card,
-                    borderWidth: active ? 2 : 1,
-                    borderColor: active ? DC.border : DC.borderDim,
-                    justifyContent: "center",
-                    alignItems: "center",
-                    paddingHorizontal: 4,
-                    paddingVertical: 8,
-                  }}
-                  onPress={() => onToggle(id)}
-                >
-                  {MARKER_IMAGES[id] ? (
-                    <Image
-                      source={MARKER_IMAGES[id]}
-                      style={{ width: 96, height: 96, marginBottom: 4 }}
-                      resizeMode="contain"
-                    />
-                  ) : (
-                    <Text style={{ fontSize: 56, marginBottom: 4 }}>
-                      {EMOJIS[id]}
-                    </Text>
-                  )}
-                  <Text
-                    style={{
-                      fontSize: T.caption,
-                      fontWeight: active ? "700" : "600",
-                      color: active ? "#fff" : DC.textSub,
-                      textAlign: "center",
-                    }}
-                    numberOfLines={2}
-                  >
-                    {t(`categories.${id}`, { defaultValue: id })}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        );
-      })}
+    <View style={{ gap: 10 }}>
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+        {visible.map((id) => {
+          const active = interests.includes(id);
+          return (
+            <TouchableOpacity
+              key={id}
+              onPress={() => onToggle(id)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: active }}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 6,
+                paddingVertical: 8,
+                paddingHorizontal: 12,
+                borderRadius: 20,
+                backgroundColor: active ? DC.border : DC.card,
+                borderWidth: active ? 2 : 1,
+                borderColor: active ? DC.border : DC.borderDim,
+              }}
+            >
+              {MARKER_IMAGES[id] ? (
+                <Image
+                  source={MARKER_IMAGES[id]}
+                  style={{ width: 22, height: 22 }}
+                  resizeMode="contain"
+                />
+              ) : (
+                <Text style={{ fontSize: 18 }}>{EMOJIS[id]}</Text>
+              )}
+              <Text
+                style={{
+                  fontSize: T.caption,
+                  fontWeight: active ? "700" : "600",
+                  color: active ? "#fff" : DC.textSub,
+                }}
+              >
+                {t(`categories.${id}`, { defaultValue: id })}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+      <TouchableOpacity
+        onPress={() => setExpanded((v) => !v)}
+        accessibilityRole="button"
+        style={{ alignSelf: "flex-start", paddingVertical: 4 }}
+      >
+        <Text style={{ fontSize: T.meta, fontWeight: "600", color: DC.accent }}>
+          {expanded
+            ? t("plan.showFewerInterests")
+            : `${t("plan.showMoreInterests")} (${all.length})`}
+        </Text>
+      </TouchableOpacity>
     </View>
   );
 });
@@ -843,6 +816,11 @@ export function PlanMyDayModal({
   // Stil s kojim je plan generiran — prikaz na karti mora ostati isti i
   // ako korisnik nakon generiranja promijeni izbor u formi.
   const [generatedStyle, setGeneratedStyle] = useState<PlanStyle>("kulturno");
+  // Ostale postavke s kojima je plan generiran (isti razlog kao gore).
+  const [generatedCompanions, setGeneratedCompanions] =
+    useState<CompanionType | null>(null);
+  const [generatedBudget, setGeneratedBudget] = useState<number | null>(null);
+  const [generatedMode, setGeneratedMode] = useState<TravelMode | null>(null);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
     new Set(),
   );
@@ -943,6 +921,9 @@ export function PlanMyDayModal({
           nowMinutes: now.getHours() * 60 + now.getMinutes(),
           style: generatedStyle,
           dayCount: generatedNumDays,
+          companions: generatedCompanions,
+          budget: generatedBudget,
+          mode: generatedMode,
         },
       );
     }
@@ -955,6 +936,9 @@ export function PlanMyDayModal({
     spontaneous,
     generatedStyle,
     generatedNumDays,
+    generatedCompanions,
+    generatedBudget,
+    generatedMode,
     userLocation,
   ]);
 
@@ -1282,6 +1266,10 @@ export function PlanMyDayModal({
       );
       setGeneratedNumDays(spontaneous ? 1 : numDays);
       setGeneratedStyle(planStyle);
+      setGeneratedCompanions(companions);
+      const budgetEur = parseInt(budget, 10);
+      setGeneratedBudget(budgetEur > 0 ? budgetEur : null);
+      setGeneratedMode(modeFromTransport(transport));
       setPreviewVenue(null);
       setNavMode(modeFromTransport(transport));
 
@@ -1306,6 +1294,9 @@ export function PlanMyDayModal({
             // nije koristila — plan je za sva tri izbora bio identičan.
             style: planStyle,
             dayCount: spontaneous ? 1 : numDays,
+            companions,
+            budget: parseInt(budget, 10) > 0 ? parseInt(budget, 10) : null,
+            mode: modeFromTransport(transport),
           },
         );
         planText += `DAN ${d + 1}\n${"─".repeat(40)}\n\n`;
@@ -1357,6 +1348,8 @@ export function PlanMyDayModal({
     // planStyle je nedostajao: povratni poziv je pamtio STARI stil pa je plan
     // bio generiran s prethodno odabranim, a ne s trenutnim.
     planStyle,
+    companions,
+    budget,
     transport,
     userLocation,
     t,
@@ -1847,6 +1840,33 @@ export function PlanMyDayModal({
   // Vremenska crta dana: vrijeme | točka na tračnici | naziv i jedan redak
   // podataka. Put između postaja je spojnica na tračnici, ne zaseban tekst.
   // ---------------------------------------------------------------------------
+  /** Procjena troška dana po osobi, usporedena s budžetom ako je zadan. */
+  const renderCostLine = () => {
+    if (activeDayActivities.length === 0) return null;
+    const cost = estimateDayCost(activeDayActivities);
+    if (cost.max <= 0) return null;
+    const perDay =
+      generatedBudget !== null
+        ? Math.round(generatedBudget / generatedNumDays)
+        : null;
+    return (
+      <Text
+        style={{
+          marginHorizontal: 16,
+          marginBottom: 8,
+          fontSize: T.meta,
+          color: DC.textDim,
+        }}
+      >
+        {t("plan.dayCost", {
+          min: Math.round(cost.min),
+          max: Math.round(cost.max),
+        })}
+        {perDay !== null ? ` · ${t("plan.dayBudget", { budget: perDay })}` : ""}
+      </Text>
+    );
+  };
+
   const renderTimeline = () => {
     const total = activeDayActivities.length;
     if (total <= 1) return null; // jedna postaja = kartica iznad je cijeli plan
@@ -3173,6 +3193,7 @@ export function PlanMyDayModal({
                 </View>
 
                 {renderStopCard()}
+                {renderCostLine()}
                 {renderTimeline()}
               </>
             )}
