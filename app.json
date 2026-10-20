@@ -13,7 +13,6 @@
       "bundleIdentifier": "com.vara.app",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "VARA koristi tvoju lokaciju za prikaz restorana, kafića, plaža i drugih zanimljivih mjesta u tvojoj blizini.",
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "VARA koristi tvoju lokaciju za prikaz restorana, kafića, plaža i drugih zanimljivih mjesta u tvojoj blizini.",
         "CFBundleURLTypes": [
           {
             "CFBundleURLSchemes": ["vara"]
@@ -34,12 +33,7 @@
         "barStyle": "light-content"
       },
       "predictiveBackGestureEnabled": false,
-      "permissions": [
-        "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION",
-        "FOREGROUND_SERVICE",
-        "FOREGROUND_SERVICE_LOCATION"
-      ],
+      "permissions": ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION"],
       "package": "com.zivac.vara",
       "versionCode": 5,
       "intentFilters": [
@@ -79,7 +73,10 @@
         {
           "locationWhenInUsePermission": "VARA koristi tvoju lokaciju za prikaz restorana, kafića, plaža i drugih zanimljivih mjesta u tvojoj blizini.",
           "isIosBackgroundLocationEnabled": false,
-          "isAndroidBackgroundLocationEnabled": false
+          "isAndroidBackgroundLocationEnabled": false,
+          "locationAlwaysAndWhenInUsePermission": false,
+          "locationAlwaysPermission": false,
+          "isAndroidForegroundServiceEnabled": false
         }
       ],
       "expo-font",
