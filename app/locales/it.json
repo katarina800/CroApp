@@ -390,7 +390,8 @@
     "searchCategories": "Cerca categoria…",
     "noCategoryMatch": "Nessuna categoria con questo nome.",
     "radiusUnit": "Raggio di ricerca: {{km}} km",
-    "hideCircle": "Nascondi cerchio"
+    "hideCircle": "Nascondi cerchio",
+    "noVisitsYet": "Non hai ancora luoghi visitati. Segna un luogo come visitato nei suoi dettagli."
   },
   "videos": {
     "title": "Video",

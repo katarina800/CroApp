@@ -378,7 +378,8 @@
     "searchCategories": "Kategorie suchen…",
     "noCategoryMatch": "Keine Kategorie mit diesem Namen.",
     "radiusUnit": "Suchradius: {{km}} km",
-    "hideCircle": "Kreis ausblenden"
+    "hideCircle": "Kreis ausblenden",
+    "noVisitsYet": "Du hast noch keine besuchten Orte. Markiere einen Ort in seinen Details als besucht."
   },
   "password": {
     "minLength": "Min. 6 Zeichen",

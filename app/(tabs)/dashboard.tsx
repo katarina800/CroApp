@@ -1396,30 +1396,19 @@ function PlaceMarker({
 }) {
   const cat = placeCategories[place.type as keyof typeof placeCategories];
   const color = cat?.color || V.silverDim;
-  const pulse = useRef(new Animated.Value(1)).current;
-
+  // Marker se na Androidu crta kao slika. Dok je "tracksViewChanges" uključen,
+  // ta se slika neprestano iznova snima — a posjećeni marker je imao beskonačnu
+  // animaciju pulsiranja, pa je svaki posjećeni marker trajno uključivao to
+  // snimanje. S desetak posjećenih mjesta (arhiva posjeta ih prikaže sva)
+  // karta bi se zagušila i ostala prazna, samo zelena pozadina. Zato se sada
+  // marker snimi jednom (kratko praćenje dok se slika učita), a posjećeni se
+  // razlikuje statičnim zelenim prstenom i kvačicom.
+  const [tracking, setTracking] = useState(true);
   useEffect(() => {
-    if (!isVisited) {
-      pulse.setValue(1);
-      return;
-    }
-    const anim = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulse, {
-          toValue: 1.5,
-          duration: 650,
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulse, {
-          toValue: 1,
-          duration: 650,
-          useNativeDriver: true,
-        }),
-      ]),
-    );
-    anim.start();
-    return () => anim.stop();
-  }, [isVisited]);
+    setTracking(true);
+    const id = setTimeout(() => setTracking(false), 800);
+    return () => clearTimeout(id);
+  }, [isVisited, place.type]);
 
   const iconSource = CATEGORY_ICONS[place.type];
 
@@ -1427,21 +1416,20 @@ function PlaceMarker({
     <Marker
       coordinate={{ latitude: place.latitude, longitude: place.longitude }}
       onPress={onPress}
-      tracksViewChanges={isVisited}
+      tracksViewChanges={tracking}
     >
       <View style={{ alignItems: "center", width: 60, height: 74 }}>
         {isVisited && (
-          <Animated.View
+          <View
             style={{
               position: "absolute",
               top: 0,
               width: 54,
               height: 54,
               borderRadius: 27,
-              borderWidth: 2.5,
+              borderWidth: 3,
               borderColor: "#34c759",
-              transform: [{ scale: pulse }],
-              opacity: 0.8,
+              opacity: 0.9,
             }}
           />
         )}
@@ -9467,6 +9455,7 @@ export default function DashboardScreen() {
   const [showRadiusCircle, setShowRadiusCircle] = useState(true);
   const [visits, setVisits] = useState<VisitRecord[]>([]);
   const [showOnlyVisited, setShowOnlyVisited] = useState(false);
+  const skipVisitedFitRef = useRef(false);
   const [hiddenPlaceIds, setHiddenPlaceIds] = useState<string[]>([]);
 
   const [selectedAgeGroups, setSelectedAgeGroups] = useState<string[]>([]);
@@ -10693,6 +10682,37 @@ export default function DashboardScreen() {
     });
   };
 
+  // Uključen prikaz "Posjećeno": kamera obuhvati sva posjećena mjesta. Prije
+  // je karta ostajala gdje jest, pa su posjećena mjesta izvan vidljivog dijela
+  // izgledala kao da ih nema.
+  useEffect(() => {
+    if (!showOnlyVisited) return;
+    if (skipVisitedFitRef.current) {
+      skipVisitedFitRef.current = false;
+      return;
+    }
+    const pts = visits.map((v) => ({
+      latitude: v.latitude,
+      longitude: v.longitude,
+    }));
+    if (pts.length === 0) return;
+    const id = setTimeout(() => {
+      if (pts.length === 1) {
+        mapRef.current?.animateToRegion(
+          { ...pts[0], latitudeDelta: 0.02, longitudeDelta: 0.02 },
+          500,
+        );
+      } else {
+        mapRef.current?.fitToCoordinates(pts, {
+          edgePadding: { top: 160, right: 60, bottom: 160, left: 60 },
+          animated: true,
+        });
+      }
+    }, 150);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showOnlyVisited]);
+
   const isVisited = (placeId: string) =>
     visits.some((v) => v.placeId === placeId);
   const ageFilteredPlaces = useMemo(() => {
@@ -11291,7 +11311,13 @@ export default function DashboardScreen() {
             icon={APP_ICONS.visited}
             label={t("map.visitedBtn")}
             active={showOnlyVisited}
-            onPress={() => setShowOnlyVisited((v) => !v)}
+            onPress={() => {
+              if (!showOnlyVisited && visits.length === 0) {
+                Alert.alert(t("map.visitedBtn"), t("map.noVisitsYet"));
+                return;
+              }
+              setShowOnlyVisited((v) => !v);
+            }}
           />
         </View>
       )}
@@ -12026,7 +12052,9 @@ export default function DashboardScreen() {
         visits={visits}
         onSelectVisit={(v) => {
           setShowArchive(false);
-          // Uključi showOnlyVisited da se posjećena mjesta renderiraju na karti
+          // Uključi showOnlyVisited da se posjećena mjesta renderiraju na karti.
+          // Kamera ide na odabrano mjesto (ispod), ne na sva posjećena.
+          skipVisitedFitRef.current = true;
           setShowOnlyVisited(true);
           setTimeout(() => {
             mapRef.current?.animateToRegion(

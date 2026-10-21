@@ -394,7 +394,8 @@
     "searchCategories": "Search categories…",
     "noCategoryMatch": "No category with that name.",
     "radiusUnit": "Search radius: {{km}} km",
-    "hideCircle": "Hide circle"
+    "hideCircle": "Hide circle",
+    "noVisitsYet": "You have no visited places yet. Mark a place as visited in its details."
   },
   "videos": {
     "title": "Videos",

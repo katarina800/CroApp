@@ -375,7 +375,8 @@
     "searchCategories": "Traži kategoriju…",
     "noCategoryMatch": "Nema kategorije s tim imenom.",
     "radiusUnit": "Radijus pretrage: {{km}} km",
-    "hideCircle": "Sakrij krug"
+    "hideCircle": "Sakrij krug",
+    "noVisitsYet": "Još nemaš posjećenih mjesta. Označi mjesto kao posjećeno u njegovim pojedinostima."
   },
   "notif": {
     "unavailableTitle": "Obavijesti nisu dostupne",
