@@ -572,7 +572,9 @@
   },
   "archive": {
     "markHint": "Označi mjesta kao posjećena na karti",
-    "noFilterResults": "Nema mjesta za odabrani filter"
+    "noFilterResults": "Nema mjesta za odabrani filter",
+    "deleteCategory": "Obriši kategoriju: {{category}}",
+    "deleteCategoryConfirm": "Obrisati sve posjete ove kategorije ({{category}}, {{count}})? Ovo se ne može poništiti."
   },
   "groups": {
     "title": "Zajedničke aktivnosti",

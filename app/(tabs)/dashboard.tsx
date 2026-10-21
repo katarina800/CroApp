@@ -4,6 +4,7 @@
 //   2. Network error za profil — tiho ignorira, ne crasha app
 //   3. Limit od 10 rezultata po kategoriji + "Prikaži više" gumb
 //   4. Strogi filteri dolaze iz locationService.ts (v5)
+import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Location from "expo-location";
 import { useFocusEffect } from "expo-router";
@@ -8461,12 +8462,15 @@ function VisitArchiveModal({
   visits,
   onSelectVisit,
   onDeleteVisit,
+  onDeleteVisits,
 }: {
   visible: boolean;
   onClose: () => void;
   visits: VisitRecord[];
   onSelectVisit: (v: VisitRecord) => void;
   onDeleteVisit: (id: string) => void;
+  /** Briše više posjeta odjednom (cijela kategorija). */
+  onDeleteVisits: (ids: string[]) => void;
 }) {
   const { t } = useTranslation();
   const { isDark } = useTheme();
@@ -8553,34 +8557,83 @@ function VisitArchiveModal({
             {usedTypes.map((type) => {
               const cat = placeCategories[type as keyof typeof placeCategories];
               const active = filter === type;
+              const inType = visits.filter((v) => v.placeType === type);
+              const typeName = t(`categories.${type}`, { defaultValue: type });
               return (
-                <TouchableOpacity
+                <View
                   key={type}
-                  style={{
-                    paddingHorizontal: 14,
-                    paddingVertical: 6,
-                    backgroundColor: active
-                      ? cat?.color || "#3a5a30"
-                      : "#2a4230",
-                    borderRadius: 8,
-                    borderWidth: 1,
-                    borderColor: active
-                      ? cat?.color || DC.border
-                      : DC.borderDim,
-                  }}
-                  onPress={() => setFilter(active ? null : type)}
+                  style={{ flexDirection: "row", alignItems: "center", gap: 4 }}
                 >
-                  <Text
+                  <TouchableOpacity
                     style={{
-                      fontSize: T.meta,
-                      fontWeight: "600",
-                      color: active ? "#fff" : DC.textDim,
+                      paddingHorizontal: 14,
+                      paddingVertical: 6,
+                      backgroundColor: active
+                        ? cat?.color || "#3a5a30"
+                        : "#2a4230",
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      borderColor: active
+                        ? cat?.color || DC.border
+                        : DC.borderDim,
                     }}
+                    onPress={() => setFilter(active ? null : type)}
                   >
-                    {EMOJIS[type]}{" "}
-                    {t(`categories.${type}`, { defaultValue: type })}
-                  </Text>
-                </TouchableOpacity>
+                    <Text
+                      style={{
+                        fontSize: T.meta,
+                        fontWeight: "600",
+                        color: active ? "#fff" : DC.textDim,
+                      }}
+                    >
+                      {EMOJIS[type]} {typeName} ({inType.length})
+                    </Text>
+                  </TouchableOpacity>
+                  {/* Brisanje cijele kategorije iz arhive. */}
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    accessibilityLabel={t("archive.deleteCategory", {
+                      category: typeName,
+                    })}
+                    hitSlop={8}
+                    style={{
+                      width: 30,
+                      height: 30,
+                      borderRadius: 8,
+                      alignItems: "center",
+                      justifyContent: "center",
+                      backgroundColor: isDark ? "#3a2020" : "#f0d8d8",
+                      borderWidth: 1,
+                      borderColor: isDark ? "#5a3030" : "#d0a0a0",
+                    }}
+                    onPress={() =>
+                      Alert.alert(
+                        t("archive.deleteCategory", { category: typeName }),
+                        t("archive.deleteCategoryConfirm", {
+                          category: typeName,
+                          count: inType.length,
+                        }),
+                        [
+                          { text: t("common.cancel"), style: "cancel" },
+                          {
+                            text: t("common.remove"),
+                            style: "destructive",
+                            onPress: () => {
+                              onDeleteVisits(inType.map((v) => v.id));
+                              if (filter === type) setFilter(null);
+                            },
+                          },
+                        ],
+                      )
+                    }
+                  >
+                    <Ionicons
+                      name="trash-outline"
+                      size={16}
+                      color={isDark ? "#e08080" : "#a03030"}
+                    />
+                  </TouchableOpacity>
+                </View>
               );
             })}
           </ScrollView>
@@ -8731,7 +8784,11 @@ function VisitArchiveModal({
                       )
                     }
                   >
-                    <Text style={{ fontSize: T.lead }}></Text>
+                    <Ionicons
+                      name="trash-outline"
+                      size={18}
+                      color={isDark ? "#e08080" : "#a03030"}
+                    />
                   </TouchableOpacity>
                 </TouchableOpacity>
               );
@@ -10628,6 +10685,14 @@ export default function DashboardScreen() {
     saveJSON(STORAGE_VISITS, updated);
   };
 
+  const handleDeleteVisits = async (ids: string[]) => {
+    await Promise.all(ids.map((id) => backendDeleteVisit(id)));
+    const gone = new Set(ids);
+    const updated = visits.filter((v) => !gone.has(v.id));
+    setVisits(updated);
+    saveJSON(STORAGE_VISITS, updated);
+  };
+
   const handleHidePlace = async (placeId: string) => {
     const updated = [...hiddenPlaceIds, placeId];
     setHiddenPlaceIds(updated);
@@ -12079,6 +12144,7 @@ export default function DashboardScreen() {
           }, 400);
         }}
         onDeleteVisit={handleDeleteVisit}
+        onDeleteVisits={handleDeleteVisits}
       />
       <BadgesModal
         visible={showBadges}

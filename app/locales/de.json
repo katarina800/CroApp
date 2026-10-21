@@ -1064,7 +1064,9 @@
   },
   "archive": {
     "markHint": "Orte auf der Karte als besucht markieren",
-    "noFilterResults": "Keine Orte für den ausgewählten Filter"
+    "noFilterResults": "Keine Orte für den ausgewählten Filter",
+    "deleteCategory": "Kategorie löschen: {{category}}",
+    "deleteCategoryConfirm": "Alle Besuche dieser Kategorie löschen ({{category}}, {{count}})? Das kann nicht rückgängig gemacht werden."
   },
   "badges": {
     "newBadge": "🏆 Neues Abzeichen!",

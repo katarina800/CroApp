@@ -551,7 +551,9 @@
   },
   "archive": {
     "markHint": "Mark places as visited on the map",
-    "noFilterResults": "No places for the selected filter"
+    "noFilterResults": "No places for the selected filter",
+    "deleteCategory": "Delete category: {{category}}",
+    "deleteCategoryConfirm": "Delete all visits in this category ({{category}}, {{count}})? This cannot be undone."
   },
   "search": {
     "title": "Search",

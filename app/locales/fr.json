@@ -535,7 +535,9 @@
   },
   "archive": {
     "markHint": "Marquer les lieux comme visités sur la carte",
-    "noFilterResults": "Aucun lieu pour le filtre sélectionné"
+    "noFilterResults": "Aucun lieu pour le filtre sélectionné",
+    "deleteCategory": "Supprimer la catégorie : {{category}}",
+    "deleteCategoryConfirm": "Supprimer toutes les visites de cette catégorie ({{category}}, {{count}}) ? Cette action est irréversible."
   },
   "badges": {
     "newBadge": "🏆 Nouveau badge !",
