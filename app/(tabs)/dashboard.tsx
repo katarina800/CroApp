@@ -9373,7 +9373,7 @@ function QuickCategoryBar({
 // kao zatvorene i obratno.
 
 export default function DashboardScreen() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { isDark } = useTheme();
   const DC = getDashColors(isDark);
   // POST_CATEGORY_IDS, a ne samo placeCategories: "Ostalo" nije vrsta mjesta
@@ -12273,7 +12273,16 @@ export default function DashboardScreen() {
               const catLabel = focusedType
                 ? t(`categories.${focusedType}`, { defaultValue: focusedType })
                 : activeCatCount > 1
-                  ? t("map.categoriesCount", { count: activeCatCount })
+                  ? t(
+                      // Hrvatski: 2–4 "kategorije", inače "kategorija".
+                      i18n.language === "hr" &&
+                        activeCatCount % 10 >= 2 &&
+                        activeCatCount % 10 <= 4 &&
+                        (activeCatCount % 100 < 12 || activeCatCount % 100 > 14)
+                        ? "map.categoriesCountFew"
+                        : "map.categoriesCount",
+                      { count: activeCatCount },
+                    )
                   : selectedTypes.length === 1
                     ? t(`categories.${selectedTypes[0]}`, {
                         defaultValue: selectedTypes[0],

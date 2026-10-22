@@ -341,7 +341,7 @@
     "notAvailable": "Opening hours not available",
     "openNow": "Currently open",
     "closedNow": "Currently closed",
-    "shownOfTotal": "{{shown}} of {{total}} · {{label}}",
+    "shownOfTotal": "{{shown}} of {{total}} activities · {{label}}",
     "unconfirmedHours": "{{count}} with unconfirmed opening hours",
     "noneOpenInWindow": "According to opening hours, nothing is open at this time of day.",
     "showAllPlaces": "Show all ({{count}})",
@@ -395,7 +395,8 @@
     "noCategoryMatch": "No category with that name.",
     "radiusUnit": "Search radius: {{km}} km",
     "hideCircle": "Hide circle",
-    "noVisitsYet": "You have no visited places yet. Mark a place as visited in its details."
+    "noVisitsYet": "You have no visited places yet. Mark a place as visited in its details.",
+    "categoriesCountFew": "{{count}} categories"
   },
   "videos": {
     "title": "Videos",

@@ -336,7 +336,7 @@
     "notAvailable": "Horaires d'ouverture non disponibles",
     "openNow": "Actuellement ouvert",
     "closedNow": "Actuellement fermé",
-    "shownOfTotal": "{{shown}} sur {{total}} · {{label}}",
+    "shownOfTotal": "{{shown}} sur {{total}} activités · {{label}}",
     "unconfirmedHours": "{{count}} sans horaires confirmés",
     "noneOpenInWindow": "D'après les horaires, rien n'est ouvert à ce moment de la journée.",
     "showAllPlaces": "Tout afficher ({{count}})",
@@ -391,7 +391,8 @@
     "noCategoryMatch": "Aucune catégorie de ce nom.",
     "radiusUnit": "Rayon de recherche : {{km}} km",
     "hideCircle": "Masquer le cercle",
-    "noVisitsYet": "Tu n'as encore aucun lieu visité. Marque un lieu comme visité dans ses détails."
+    "noVisitsYet": "Tu n'as encore aucun lieu visité. Marque un lieu comme visité dans ses détails.",
+    "categoriesCountFew": "{{count}} catégories"
   },
   "videos": {
     "title": "Vidéos",

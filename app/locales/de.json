@@ -325,7 +325,7 @@
     "notAvailable": "Öffnungszeiten nicht verfügbar",
     "openNow": "Derzeit geöffnet",
     "closedNow": "Derzeit geschlossen",
-    "shownOfTotal": "{{shown}} von {{total}} · {{label}}",
+    "shownOfTotal": "{{shown}} von {{total}} Aktivitäten · {{label}}",
     "unconfirmedHours": "{{count}} ohne bestätigte Öffnungszeiten",
     "noneOpenInWindow": "Laut Öffnungszeiten hat zu dieser Tageszeit nichts geöffnet.",
     "showAllPlaces": "Alle anzeigen ({{count}})",
@@ -379,7 +379,8 @@
     "noCategoryMatch": "Keine Kategorie mit diesem Namen.",
     "radiusUnit": "Suchradius: {{km}} km",
     "hideCircle": "Kreis ausblenden",
-    "noVisitsYet": "Du hast noch keine besuchten Orte. Markiere einen Ort in seinen Details als besucht."
+    "noVisitsYet": "Du hast noch keine besuchten Orte. Markiere einen Ort in seinen Details als besucht.",
+    "categoriesCountFew": "{{count}} Kategorien"
   },
   "password": {
     "minLength": "Min. 6 Zeichen",

@@ -322,7 +322,7 @@
     "notAvailable": "Radno vrijeme nije dostupno",
     "openNow": "Trenutno otvoreno",
     "closedNow": "Trenutno zatvoreno",
-    "shownOfTotal": "{{shown}} od {{total}} · {{label}}",
+    "shownOfTotal": "{{shown}} od {{total}} aktivnosti · {{label}}",
     "unconfirmedHours": "{{count}} bez potvrđenog radnog vremena",
     "noneOpenInWindow": "Prema radnom vremenu, ništa nije otvoreno u ovom dijelu dana.",
     "showAllPlaces": "Prikaži sve ({{count}})",
@@ -376,7 +376,8 @@
     "noCategoryMatch": "Nema kategorije s tim imenom.",
     "radiusUnit": "Radijus pretrage: {{km}} km",
     "hideCircle": "Sakrij krug",
-    "noVisitsYet": "Još nemaš posjećenih mjesta. Označi mjesto kao posjećeno u njegovim pojedinostima."
+    "noVisitsYet": "Još nemaš posjećenih mjesta. Označi mjesto kao posjećeno u njegovim pojedinostima.",
+    "categoriesCountFew": "{{count}} kategorije"
   },
   "notif": {
     "unavailableTitle": "Obavijesti nisu dostupne",
